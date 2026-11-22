@@ -1,0 +1,5 @@
+/MONO.STT.exe
+/src-tauri/target/
+/src-tauri/gen/schemas/
+__pycache__/
+.env
