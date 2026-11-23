@@ -1,6 +1,6 @@
 {
   "productName": "MONO.STT",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "identifier": "local.inkvoice.desktop",
   "build": {
     "frontendDist": "../ui"
@@ -10,6 +10,7 @@
     "windows": [
       {
         "title": "MONO.STT",
+        "center": true,
         "width": 1000,
         "height": 680,
         "minWidth": 800,
