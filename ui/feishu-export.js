@@ -10,6 +10,7 @@ function createFeishuExport(React, jsx) {
     const [recoveryLink, setRecoveryLink] = React.useState('');
     const [busy, setBusy] = React.useState('');
     const [error, setError] = React.useState('');
+    const [permissions, setPermissions] = React.useState(null);
     const [notice, setNotice] = React.useState('');
     const call = desktop.invoke;
 
@@ -21,6 +22,7 @@ function createFeishuExport(React, jsx) {
 
     async function open() {
       setError('');
+      setPermissions(null);
       setNotice('');
       setAppSecret('');
       setRecoveryLink('');
@@ -42,6 +44,7 @@ function createFeishuExport(React, jsx) {
     async function save(event) {
       event.preventDefault();
       setError('');
+      setPermissions(null);
       setNotice('');
       setBusy('save');
       try {
@@ -67,10 +70,12 @@ function createFeishuExport(React, jsx) {
         });
         setStatus(current => ({...current, url, needsRecovery:false, format}));
         setRecoveryLink('');
+        setPermissions(null);
         setNotice('飞书文档已写入。');
       } catch (failure) {
-        setError(String(failure));
-        try { await readStatus(); } catch { /* Preserve the publish error. */ }
+        if (failure?.kind === 'permissions') setPermissions(failure);
+        else { setPermissions(null); setError(failure?.message || String(failure)); }
+        try { await readStatus(); } catch { /* Keep the current publish status. */ }
       } finally {
         setBusy('');
       }
@@ -85,6 +90,31 @@ function createFeishuExport(React, jsx) {
 
     function action(label, props = {}) {
       return jsx('button', {type:'button', ...props, children:label});
+    }
+
+    async function openLink(command, args) {
+      try { await call(command,args); }
+      catch (failure) { setError(String(failure)); }
+    }
+
+    async function copyLink(url) {
+      try {
+        await navigator.clipboard.writeText(url);
+        setNotice('链接已复制。');
+      } catch {
+        setError('无法访问剪贴板。可以选中上方链接并按 Ctrl+C 复制。');
+      }
+    }
+
+    function linkActions(url, label, command, args) {
+      const open = () => openLink(command,args);
+      return jsx('div',{className:'feishu-link-actions',children:[
+        url && jsx('a',{href:url,title:url,onClick:event=>{event.preventDefault();open();},children:url}),
+        jsx('div',{className:'feishu-actions',children:[
+          action(label,{onClick:open,disabled:!!busy}),
+          url && action('复制链接',{onClick:()=>copyLink(url),disabled:!!busy}),
+        ]}),
+      ]});
     }
 
     return jsx(React.Fragment, {children:[
@@ -139,6 +169,12 @@ function createFeishuExport(React, jsx) {
                 ),
               ]}),
               status.url && jsx('p', {className:'feishu-hint', children:'再次写入会替换同一篇飞书文档的正文。'}),
+              status.url && linkActions(status.url,'打开文档 ↗','feishu_open_document',{recordId}),
+              permissions && jsx('section',{className:'feishu-permission',role:'status',children:[
+                jsx('strong',{children:'需要开通飞书文档权限'}),
+                jsx('p',{className:'feishu-hint',children:'在权限管理中开通「创建及编辑新版文档」（docx:document），发布新版本。权限生效后，返回这里重试。'}),
+                linkActions(permissions.url,'打开权限设置 ↗','feishu_open_permissions'),
+              ]}),
               status.needsRecovery && jsx('div', {children:[
                 jsx('p', {className:'feishu-hint', children:'上次创建结果未确认。请核对飞书中的文档，将链接填在下方以继续写入。'}),
                 field('已创建的飞书文档链接', recoveryLink, setRecoveryLink, {required:true}),
@@ -148,14 +184,11 @@ function createFeishuExport(React, jsx) {
                   setAppId(status.appId);
                   setFolder(status.folder);
                   setError('');
+                  setPermissions(null);
                   setNotice('');
                   showSettings(true);
                 }, disabled:!!busy}),
-                status.url && action('打开文档', {disabled:!!busy, onClick:async () => {
-                  try { await call('feishu_open_document', {recordId}); }
-                  catch (failure) { setError(String(failure)); }
-                }}),
-                action(busy === 'publish' ? '写入中…' : status.url ? '更新文档' : '创建并写入', {
+                action(busy === 'publish' ? '写入中…' : permissions ? '授权后重试' : status.url ? '更新文档' : '创建并写入', {
                   type:'submit', className:'feishu-primary', disabled:!!busy,
                 }),
               ]}),

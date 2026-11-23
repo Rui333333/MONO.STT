@@ -1,7 +1,6 @@
 /* Native services used by the supplied InkVoice interface. */
 const desktop = (() => {
   const {invoke,convertFileSrc} = window.__TAURI__.core;
-  let store, initial, migrated;
   function normalize(r) {
     if (!r.name) return r.audioPath ? {...r,audioUrl:convertFileSrc(r.audioPath)} : r;
     return {id:r.id,title:r.name.replace(/\.[^.]+$/,''),sourceFileName:r.name,
@@ -10,29 +9,14 @@ const desktop = (() => {
       language:r.language,starred:false,audioPath:r.audio,audioUrl:convertFileSrc(r.audio),
       waveform:r.waveform || Array(72).fill(.25),segments:r.segments.map((s,i)=>({id:r.id+'-'+i,startSec:s.start,endSec:s.end,text:s.text}))};
   }
-  async function prepare() {
-    store = await new Promise((resolve,reject)=>{
-      const req=indexedDB.open('inkvoice',2);
-      req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('records'))req.result.createObjectStore('records',{keyPath:'id'});req.result.createObjectStore('library');};
-      req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
-    });
-    const read = (table,key)=>new Promise((resolve,reject)=>{
-      const tableRef=store.transaction(table).objectStore(table);
-      const req=key?tableRef.get(key):tableRef.getAll();
-      req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
-    });
-    initial=await read('library','records');
-    migrated = !initial;
-    if(!initial) initial=(await read('records')).sort((a,b)=>b.created-a.created).map(normalize);
-    else initial=initial.map(normalize);
+  /* SQLite is the single source of truth; MonoStore owns the snapshot and
+     all writes. normalize() is only kept for the one-shot legacy import. */
+  async function prepare() { await invoke("init_store"); return window.MonoStore.init({normalize}); }
+  function load(demos) {
+    return window.MonoStore.load(demos).map(r => r.audioPath
+      ? {...r,audioUrl:convertFileSrc(r.audioPath)} : r);
   }
-  function load(demos) {return migrated ? [...demos,...initial] : initial;}
-  function save(records) {
-    const tx=store.transaction('library','readwrite');
-    tx.objectStore('library').put(records.map(({audioUrl,...r})=>r),'records');
-    tx.oncomplete=()=>{localStorage.libraryCreated='1';};
-    tx.onabort=()=>alert('转写记录保存失败：'+tx.error);
-  }
+  function save(records) { return window.MonoStore.save(records); }
   async function run(job,update) {
     const off=await window.__TAURI__.event.listen('progress',({payload})=>{
       const match=payload.message.match(/(\d+)%/);
@@ -40,7 +24,10 @@ const desktop = (() => {
     });
     try {
       const r=await invoke('transcribe',{source:job.path,model:job.modelId,options:job.options});
-      return {...normalize({...r,name:job.fileName,created:Date.now(),model:job.modelId}),modelName:job.modelName};
+      const record=normalize({...r,name:job.fileName,created:Date.now(),model:job.modelId});
+      /* sourcePath lets the store remove the app-owned recording together
+         with the WAV. External files are rejected by the Rust path guard. */
+      return {...record,sourcePath:job.path,modelName:job.modelName};
     } finally {off();}
   }
   async function paths(files) {
@@ -149,29 +136,5 @@ function createGpuStatus(React, jsx) {
 
       ]}),
     ]});
-  };
-}
-function createGpuSetup(React, jsx, Status) {
-  return function GpuSetup() {
-    const dialog = React.useRef(null);
-    React.useEffect(() => {
-      if (localStorage.getItem('mono_gpu_setup_v1')) return;
-      dialog.current.showModal();
-    }, []);
-    function finish() {
-      localStorage.setItem('mono_gpu_setup_v1', '1');
-      dialog.current.close();
-    }
-    return jsx('dialog', {
-      ref:dialog, className:'feishu-dialog', 'aria-label':'设置 GPU 加速',
-      onCancel:finish,
-      children:[
-        jsx('header',{children:jsx('h2',{children:'设置 GPU 加速'})}),
-        jsx(Status,{}),
-        jsx('p',{className:'feishu-hint',children:'检测完成后，可根据结果安装 CUDA 12.9。安装完成请点击重新检测。也可以先使用 CPU，之后在偏好设置的推理引擎中继续设置。'}),
-        jsx('div',{className:'feishu-actions',children:
-          jsx('button',{type:'button',onClick:finish,children:'继续使用 MONO.STT'})}),
-      ],
-    });
   };
 }

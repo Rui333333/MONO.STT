@@ -8,10 +8,34 @@
     
     
     
+    <link rel="stylesheet" href="startup.css">
     <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="dropdown.css">
   <link rel="stylesheet" href="fonts.css"></head>
   <body class="bg-white text-neutral-950 dark:bg-neutral-950 dark:text-neutral-50 antialiased selection:bg-neutral-900 selection:text-white dark:selection:bg-neutral-100 dark:selection:text-neutral-950">
-    <div id="root"></div>
-    <script src="desktop.js"></script><script src="window-controls.js"></script><script src="record-confirm.js"></script><script src="dropdown.js"></script><script src="transfer.js"></script><script src="reading-position.js"></script><script src="feishu-export.js"></script><script src="app.js"></script>
+    <div class="startup">
+      <div class="startup-inner">
+        <div class="startup-icon"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="120 168 272 176" width="272" height="176">
+  <!-- 左侧 3 根圆角声波竖条 (x=120/166/212, w=28, h=96/176/120, 居中 y=256) -->
+  <rect x="120" y="208" width="28" height="96" rx="14" fill="currentColor"/>
+  <rect x="166" y="168" width="28" height="176" rx="14" fill="currentColor"/>
+  <rect x="212" y="196" width="28" height="120" rx="14" fill="currentColor"/>
+  <!-- 右侧 3 行圆角文字横条 (x=276, y=190/243/296, h=26, w=116/92/74) -->
+  <rect x="276" y="190" width="116" height="26" rx="13" fill="currentColor"/>
+  <rect x="276" y="243" width="92" height="26" rx="13" fill="currentColor"/>
+  <rect x="276" y="296" width="74" height="26" rx="13" fill="currentColor"/>
+  <!-- 第三行末尾右对齐落笔圆点 (直径26, x=366, y=296 => cx=379, cy=309, r=13) -->
+  <circle cx="379" cy="309" r="13" fill="currentColor"/>
+</svg>
+</div>
+        <div class="startup-name">MONO.STT</div>
+        <div class="startup-status" role="status">正在启动</div>
+        <p class="startup-error"></p>
+        <button type="button" hidden>重试</button>
+      </div>
+    </div>
+    <div id="root" inert></div>
+    <script src="theme-transition.js"></script><script src="startup.js"></script>
+    <script src="store-service.js"></script><script src="desktop.js"></script><script src="window-controls.js"></script><script src="record-confirm.js"></script><script src="dropdown.js"></script><script src="transfer.js"></script><script src="reading-position.js"></script><script src="feishu-export.js"></script><script src="onboarding-host.js"></script><script src="app.js"></script>
   </body>
 </html>

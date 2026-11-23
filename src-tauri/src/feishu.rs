@@ -1,10 +1,10 @@
 use serde_json::{json, Value};
 use std::{
     ffi::OsStr,
-    fs::{self, OpenOptions},
+    fs,
     io::{self, Write},
     os::windows::{ffi::OsStrExt, process::CommandExt},
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{Command, Stdio},
     ptr::{null, null_mut},
     sync::{Mutex, TryLockError},
@@ -15,7 +15,6 @@ use windows_sys::Win32::{
     Security::Credentials::{
         CredFree, CredReadW, CredWriteW, CREDENTIALW, CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC,
     },
-    Storage::FileSystem::{MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH},
     UI::{Shell::ShellExecuteW, WindowsAndMessaging::SW_SHOWNORMAL},
 };
 
@@ -87,6 +86,7 @@ fn store_credentials(value: &Value) -> Result<(), String> {
 struct ApiError {
     message: String,
     rejected: bool,
+    missing_permissions: bool,
 }
 
 impl ApiError {
@@ -94,6 +94,7 @@ impl ApiError {
         Self {
             message: message.into(),
             rejected: false,
+            missing_permissions: false,
         }
     }
 }
@@ -154,6 +155,7 @@ fn api(
         .map_err(|error| ApiError {
             message: format!("无法启动飞书连接：{error}"),
             rejected: true,
+            missing_permissions: false,
         })?;
     if child
         .stdin
@@ -173,6 +175,7 @@ fn api(
         return Err(ApiError {
             message: format!("连接飞书失败（curl {code}）"),
             rejected: matches!(code, 5 | 6 | 7 | 35 | 60),
+            missing_permissions: false,
         });
     }
     let response = String::from_utf8_lossy(&output.stdout);
@@ -183,6 +186,7 @@ fn api(
     let parsed: Value = serde_json::from_str(response).map_err(|_| ApiError {
         message: format!("飞书响应格式异常（HTTP {status}）"),
         rejected: (400..500).contains(&status),
+        missing_permissions: false,
     })?;
     let code = parsed["code"].as_i64();
     if (200..300).contains(&status) && code == Some(0) {
@@ -199,7 +203,10 @@ fn api(
             "飞书请求失败（{}）：{detail}",
             code.map_or_else(|| status.to_string(), |value| value.to_string())
         ),
-        rejected: (400..500).contains(&status) || ((200..300).contains(&status) && code.is_some()),
+        missing_permissions: code == Some(99991672),
+        rejected: code == Some(99991672)
+            || (400..500).contains(&status)
+            || ((200..300).contains(&status) && code.is_some()),
     })
 }
 
@@ -297,54 +304,52 @@ pub async fn feishu_save_credentials(
     .map_err(|error| error.to_string())?
 }
 
-fn binding_path(app: &tauri::AppHandle, record_id: &str) -> Result<PathBuf, String> {
-    if !valid_id(record_id) {
-        return Err("转录记录 ID 无效".into());
-    }
-    let folder = app
-        .path()
-        .app_local_data_dir()
-        .map_err(|error| error.to_string())?
-        .join("feishu");
-    Ok(folder.join(format!("record-{record_id}.json")))
+struct Binding<'a> {
+    app: &'a tauri::AppHandle,
+    id: &'a str,
 }
 
-fn read_binding(path: &Path) -> Result<Value, String> {
-    match fs::read(path) {
-        Ok(bytes) => serde_json::from_slice(&bytes).map_err(|_| "本地飞书文档关联已损坏".into()),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(Value::Null),
-        Err(error) => Err(format!("无法读取飞书文档关联：{error}")),
-    }
-}
-
-fn write_binding(path: &Path, value: &Value) -> Result<(), String> {
-    let parent = path.parent().ok_or("无法定位飞书文档关联目录")?;
-    fs::create_dir_all(parent).map_err(|error| error.to_string())?;
-    let temporary = parent.join(format!("{}.tmp", uuid::Uuid::new_v4()));
-    let result = (|| -> io::Result<()> {
-        let mut file = OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&temporary)?;
-        file.write_all(&serde_json::to_vec(value)?)?;
-        file.sync_all()?;
-        drop(file);
-        if unsafe {
-            MoveFileExW(
-                wide(&temporary).as_ptr(),
-                wide(path).as_ptr(),
-                MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
-            )
-        } == 0
-        {
-            return Err(io::Error::last_os_error());
+impl<'a> Binding<'a> {
+    fn new(app: &'a tauri::AppHandle, id: &'a str) -> Result<Self, String> {
+        if !valid_id(id) {
+            return Err("转录记录 ID 无效".into());
         }
-        Ok(())
-    })();
-    if result.is_err() {
-        let _ = fs::remove_file(temporary);
+        Ok(Self { app, id })
     }
-    result.map_err(|error| format!("无法保存飞书文档关联：{error}"))
+
+    fn key(&self) -> String {
+        format!("feishu.binding.{}", self.id)
+    }
+
+    fn read(&self) -> Result<Value, String> {
+        let store = self.app.state::<crate::store::Store>();
+        let key = self.key();
+        if let Some(payload) = store.get(&key)? {
+            return serde_json::from_str(&payload).map_err(|e| e.to_string());
+        }
+        let path = self
+            .app
+            .path()
+            .app_local_data_dir()
+            .map_err(|e| e.to_string())?
+            .join("feishu")
+            .join(format!("record-{}.json", self.id));
+        match fs::read(path) {
+            Ok(bytes) => {
+                let binding: Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+                store.set(&key, &binding.to_string())?;
+                Ok(binding)
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(Value::Null),
+            Err(error) => Err(format!("无法读取飞书文档关联：{error}")),
+        }
+    }
+
+    fn write(&self, value: &Value) -> Result<(), String> {
+        self.app
+            .state::<crate::store::Store>()
+            .set(&self.key(), &value.to_string())
+    }
 }
 
 fn binding_url(binding: &Value) -> Option<String> {
@@ -356,7 +361,7 @@ fn binding_url(binding: &Value) -> Option<String> {
 #[tauri::command]
 pub fn feishu_status(app: tauri::AppHandle, record_id: String) -> Result<Value, String> {
     let config = credentials()?.unwrap_or_default();
-    let binding = read_binding(&binding_path(&app, &record_id)?)?;
+    let binding = Binding::new(&app, &record_id)?.read()?;
     Ok(json!({
         "appId": text(&config, "appId"),
         "folder": text(&config, "folder"),
@@ -368,8 +373,24 @@ pub fn feishu_status(app: tauri::AppHandle, record_id: String) -> Result<Value, 
 
 #[tauri::command]
 pub fn feishu_open_document(app: tauri::AppHandle, record_id: String) -> Result<(), String> {
-    let binding = read_binding(&binding_path(&app, &record_id)?)?;
+    let binding = Binding::new(&app, &record_id)?.read()?;
     let url = binding_url(&binding).ok_or("此转录尚未关联飞书文档")?;
+    open_feishu_url(&url)
+}
+
+fn permissions_url(app_id: &str) -> Option<String> {
+    (app_id.starts_with("cli_") && valid_id(app_id)).then(||
+        format!("https://open.feishu.cn/app/{app_id}/auth?q=docx%3Adocument&op_from=openapi&token_type=tenant"))
+}
+
+#[tauri::command]
+pub fn feishu_open_permissions() -> Result<(), String> {
+    let config = credentials()?.ok_or("请先配置飞书应用凭据")?;
+    let url = permissions_url(text(&config, "appId")).ok_or("飞书应用 ID 无效")?;
+    open_feishu_url(&url)
+}
+
+fn open_feishu_url(url: &str) -> Result<(), String> {
     let result = unsafe {
         ShellExecuteW(
             null_mut(),
@@ -381,9 +402,48 @@ pub fn feishu_open_document(app: tauri::AppHandle, record_id: String) -> Result<
         )
     };
     if (result as isize) <= 32 {
-        return Err("无法打开飞书文档链接".into());
+        return Err("无法打开飞书链接".into());
     }
     Ok(())
+}
+
+#[derive(Debug)]
+enum PublishError {
+    Message(String),
+    Permissions,
+}
+impl From<String> for PublishError {
+    fn from(value: String) -> Self {
+        Self::Message(value)
+    }
+}
+impl From<&str> for PublishError {
+    fn from(value: &str) -> Self {
+        Self::Message(value.into())
+    }
+}
+impl From<ApiError> for PublishError {
+    fn from(value: ApiError) -> Self {
+        if value.missing_permissions {
+            Self::Permissions
+        } else {
+            Self::Message(value.message)
+        }
+    }
+}
+impl PublishError {
+    fn into_response(self) -> Value {
+        match self {
+            Self::Permissions => {
+                let url = credentials()
+                    .ok()
+                    .flatten()
+                    .and_then(|config| permissions_url(text(&config, "appId")));
+                json!({"kind":"permissions","url":url})
+            }
+            Self::Message(message) => json!({"kind":"error","message":message}),
+        }
+    }
 }
 
 #[tauri::command]
@@ -394,7 +454,7 @@ pub async fn feishu_publish(
     format: String,
     content: String,
     recovery_link: Option<String>,
-) -> Result<String, String> {
+) -> Result<String, Value> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<FeishuPublish>();
         let _guard = state.0.try_lock().map_err(|error| match error {
@@ -402,7 +462,7 @@ pub async fn feishu_publish(
             TryLockError::Poisoned(_) => "飞书发布状态异常，请重启应用",
         })?;
         publish(
-            &binding_path(&app, &record_id)?,
+            &Binding::new(&app, &record_id)?,
             &title,
             &format,
             &content,
@@ -410,20 +470,21 @@ pub async fn feishu_publish(
         )
     })
     .await
-    .map_err(|error| error.to_string())?
+    .map_err(|error| PublishError::from(error.to_string()).into_response())?
+    .map_err(PublishError::into_response)
 }
 
 fn publish(
-    path: &Path,
+    storage: &Binding<'_>,
     title: &str,
     format: &str,
     content: &str,
     recovery_link: Option<&str>,
-) -> Result<String, String> {
+) -> Result<String, PublishError> {
     let blocks = transcript_blocks(format, content)?;
     let config = credentials()?.ok_or("请先配置飞书应用凭据")?;
     let app_id = text(&config, "appId");
-    let mut binding = read_binding(path)?;
+    let mut binding = storage.read()?;
     if !binding.is_null() && text(&binding, "appId") != app_id {
         return Err("此转录已关联另一飞书应用创建的文档，请切换回原应用凭据".into());
     }
@@ -436,7 +497,7 @@ fn publish(
     };
     if binding.is_null() {
         binding = json!({ "appId": app_id, "title": title, "host": text(&config,"host") });
-        write_binding(path, &binding)?;
+        storage.write(&binding)?;
         let mut body = json!({ "title": title });
         let folder = text(&config, "folderId");
         if !folder.is_empty() {
@@ -445,15 +506,17 @@ fn publish(
         let response = match api("POST", DOCUMENTS, Some(&token), Some(&body)) {
             Ok(response) => response,
             Err(error) if error.rejected => {
-                fs::remove_file(path)
+                storage
+                    .write(&Value::Null)
                     .map_err(|e| format!("{}；无法清理待创建状态：{e}", error.message))?;
-                return Err(error.message);
+                return Err(error.into());
             }
             Err(error) => {
                 return Err(format!(
                     "{}。创建结果未确认，请先核对飞书中是否已生成文档。",
                     error.message
-                ))
+                )
+                .into())
             }
         };
         let id = text(&response["data"]["document"], "document_id");
@@ -461,28 +524,33 @@ fn publish(
             return Err("飞书未返回有效文档 ID，请核对创建结果后关联原文档".into());
         }
         binding["documentId"] = json!(id);
-        write_binding(path, &binding).map_err(|error| format!("{error}。已建文档 ID：{id}"))?;
+        storage
+            .write(&binding)
+            .map_err(|error| format!("{error}。已建文档 ID：{id}"))?;
     } else if binding["documentId"].is_null() {
         let (id, host) = target(recovery_link.unwrap_or_default(), "docx")?;
         if id.is_empty() {
             return Err("请填写上次创建的飞书文档链接，避免重复创建".into());
         }
-        let meta = api("GET", &format!("{DOCUMENTS}/{id}"), Some(&token), None)
-            .map_err(|error| error.message)?;
+        let meta = api("GET", &format!("{DOCUMENTS}/{id}"), Some(&token), None)?;
         let document = &meta["data"]["document"];
         if text(document, "title") != text(&binding, "title") || document["revision_id"] != 1 {
             return Err("仅可关联与上次请求同标题、尚未编辑的飞书文档，请核对链接".into());
         }
         binding["documentId"] = json!(id);
         binding["host"] = json!(host);
-        write_binding(path, &binding)?;
+        storage.write(&binding)?;
     }
     let id = text(&binding, "documentId");
     let url = binding_url(&binding).ok_or("飞书文档关联无效")?;
-    write_transcript(id, &token, &blocks, api)
-        .map_err(|error| format!("{error}。文档已关联，重试会继续使用同一篇文档。"))?;
+    write_transcript(id, &token, &blocks, api).map_err(|error| match error {
+        PublishError::Message(message) => {
+            PublishError::Message(format!("{message}。文档已关联，重试会继续使用同一篇文档。"))
+        }
+        PublishError::Permissions => PublishError::Permissions,
+    })?;
     binding["format"] = json!(format);
-    write_binding(path, &binding)?;
+    storage.write(&binding)?;
     Ok(url)
 }
 
@@ -541,10 +609,10 @@ fn write_transcript(
     token: &str,
     blocks: &[Value],
     request: impl Fn(&str, &str, Option<&str>, Option<&Value>) -> Result<Value, ApiError>,
-) -> Result<(), String> {
+) -> Result<(), PublishError> {
     let path = format!("{DOCUMENTS}/{document}");
     let root = format!("{path}/blocks/{document}");
-    let response = request("GET", &path, Some(token), None).map_err(|error| error.message)?;
+    let response = request("GET", &path, Some(token), None)?;
     let mut revision = response["data"]["document"]["revision_id"]
         .as_i64()
         .ok_or("飞书未返回文档版本")?;
@@ -553,8 +621,7 @@ fn write_transcript(
         &format!("{root}?document_revision_id={revision}"),
         Some(token),
         None,
-    )
-    .map_err(|error| error.message)?;
+    )?;
     let page = &response["data"]["block"];
     if text(page, "block_id") != document || page["block_type"] != 1 {
         return Err("飞书未返回文档的根块".into());
@@ -568,8 +635,7 @@ fn write_transcript(
             &format!("{root}/children?document_revision_id={revision}"),
             Some(token),
             Some(&json!({"index":previous + index * BATCH_SIZE, "children":chunk})),
-        )
-        .map_err(|error| error.message)?;
+        )?;
         revision = response["data"]["document_revision_id"]
             .as_i64()
             .ok_or("飞书未确认本次正文写入版本")?;
@@ -583,8 +649,7 @@ fn write_transcript(
             &format!("{root}/children/batch_delete?document_revision_id={revision}"),
             Some(token),
             Some(&json!({"start_index":start, "end_index":end})),
-        )
-        .map_err(|error| error.message)?;
+        )?;
         revision = response["data"]["document_revision_id"]
             .as_i64()
             .ok_or("飞书未确认本次正文更新版本")?;
@@ -679,20 +744,12 @@ mod tests {
     }
 
     #[test]
-    fn binding_survives_replacement_and_rejects_non_feishu_hosts() {
-        let root = std::env::temp_dir().join(format!("mono-feishu-test-{}", uuid::Uuid::new_v4()));
-        let path = root.join("binding.json");
-        write_binding(
-            &path,
-            &json!({"appId":"cli_test","host":"tenant.feishu.cn"}),
-        )
-        .unwrap();
-        let mut binding = read_binding(&path).unwrap();
-        assert!(binding_url(&binding).is_none());
-        binding["documentId"] = json!("docx123");
-        write_binding(&path, &binding).unwrap();
+    fn binding_rejects_non_feishu_hosts() {
+        assert!(
+            binding_url(&json!({"documentId":"docx123","host":"feishu.cn.evil.example"})).is_none()
+        );
         assert_eq!(
-            binding_url(&read_binding(&path).unwrap()).as_deref(),
+            binding_url(&json!({"documentId":"docx123","host":"tenant.feishu.cn"})).as_deref(),
             Some("https://tenant.feishu.cn/docx/docx123")
         );
         assert!(target(
@@ -700,7 +757,5 @@ mod tests {
             "drive/folder"
         )
         .is_err());
-        fs::remove_file(path).unwrap();
-        fs::remove_dir(root).unwrap();
     }
 }

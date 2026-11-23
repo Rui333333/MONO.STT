@@ -3,3 +3,6 @@
 /src-tauri/gen/schemas/
 __pycache__/
 .env
+
+/data/
+/.build.log

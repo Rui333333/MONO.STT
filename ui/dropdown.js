@@ -1,6 +1,6 @@
 /* Shared desktop dropdown for single-choice controls and model shortcuts. */
 function createDropdown(React, jsx) {
-  return function Dropdown({label, value, items, onChange, trigger, align = 'start', minWidth = 160, empty}) {
+  return function Dropdown({label, value, items, onChange, trigger, align = 'start', minWidth = 160, empty, disabled = false}) {
     const id = React.useId();
     const button = React.useRef(null);
     const menu = React.useRef(null);
@@ -10,40 +10,43 @@ function createDropdown(React, jsx) {
 
     React.useEffect(() => {
       const popup = menu.current;
+      const owner = popup.ownerDocument;
+      const viewport = owner.defaultView;
       const sync = () => setOpen(popup.matches(':popover-open'));
       const dismiss = event => {
         const target = event.target;
-        if (target instanceof Node && (popup.contains(target) || button.current?.contains(target))) return;
+        if (target instanceof viewport.Node && (popup.contains(target) || button.current?.contains(target))) return;
         popup.hidePopover();
       };
       popup.addEventListener('toggle', sync);
-      document.addEventListener('pointerdown', dismiss, true);
-      window.addEventListener('resize', dismiss);
-      window.addEventListener('scroll', dismiss, true);
+      owner.addEventListener('pointerdown', dismiss, true);
+      viewport.addEventListener('resize', dismiss);
+      viewport.addEventListener('scroll', dismiss, true);
       return () => {
         popup.removeEventListener('toggle', sync);
-        document.removeEventListener('pointerdown', dismiss, true);
-        window.removeEventListener('resize', dismiss);
-        window.removeEventListener('scroll', dismiss, true);
+        owner.removeEventListener('pointerdown', dismiss, true);
+        viewport.removeEventListener('resize', dismiss);
+        viewport.removeEventListener('scroll', dismiss, true);
       };
     }, []);
 
     function show(last = false) {
       const popup = menu.current;
       const anchor = button.current.getBoundingClientRect();
-      const width = Math.min(Math.max(anchor.width, minWidth), window.innerWidth - 16);
+      const viewport = popup.ownerDocument.defaultView;
+      const width = Math.min(Math.max(anchor.width, minWidth), viewport.innerWidth - 16);
       const left = align === 'end' ? anchor.right - width :
         align === 'center' ? anchor.left + (anchor.width - width) / 2 : anchor.left;
-      const below = window.innerHeight - anchor.bottom - 14;
+      const below = viewport.innerHeight - anchor.bottom - 14;
       const above = anchor.top - 14;
       const upwards = below < Math.min(280, items.length * 42 + 20) && above > below;
 
       Object.assign(popup.style, {
         width: width + 'px',
-        left: Math.max(8, Math.min(left, window.innerWidth - width - 8)) + 'px',
+        left: Math.max(8, Math.min(left, viewport.innerWidth - width - 8)) + 'px',
         maxHeight: Math.min(280, upwards ? above : below) + 'px',
         top: upwards ? 'auto' : anchor.bottom + 6 + 'px',
-        bottom: upwards ? window.innerHeight - anchor.top + 6 + 'px' : 'auto',
+        bottom: upwards ? viewport.innerHeight - anchor.top + 6 + 'px' : 'auto',
       });
       popup.showPopover();
       const rows = choices();
@@ -69,7 +72,7 @@ function createDropdown(React, jsx) {
       event.preventDefault();
       const rows = choices();
       if (!rows.length) return;
-      const index = rows.indexOf(document.activeElement);
+      const index = rows.indexOf(menu.current.ownerDocument.activeElement);
       const next = key === 'Home' ? 0 : key === 'End' ? rows.length - 1 :
         (index + (key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length;
       rows[next].focus();
@@ -77,7 +80,7 @@ function createDropdown(React, jsx) {
 
     return jsx('div', {className:'mono-dropdown', children:[
       jsx('button', {
-        ref:button, type:'button', className:'mono-dropdown-trigger',
+        ref:button, type:'button', disabled, className:'mono-dropdown-trigger',
         'aria-haspopup':'menu', 'aria-expanded':open, 'aria-controls':id,
         'aria-label':current ? label + ' · ' + current.label : label,
         onClick:() => menu.current.matches(':popover-open') ? menu.current.hidePopover() : show(),

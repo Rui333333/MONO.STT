@@ -2,6 +2,7 @@
 
 mod feishu;
 mod models;
+mod store;
 
 use serde_json::{json, Value};
 use std::os::windows::process::CommandExt;
@@ -190,7 +191,7 @@ async fn transcribe(
     model: String,
     options: Value,
 ) -> Result<Value, String> {
-    tauri::async_runtime::spawn_blocking(move || run_worker(app, source, model, options))
+    tauri::async_runtime::spawn_blocking(move || run_worker(app, source, model, options, false))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -200,6 +201,7 @@ fn run_worker(
     source: String,
     model: String,
     options: Value,
+    preview: bool,
 ) -> Result<Value, String> {
     if !models::valid_model(&model) {
         return Err("未知模型".into());
@@ -208,8 +210,7 @@ fn run_worker(
     if !models::installed(&model_dir) {
         return Err(format!("未找到完整的模型：{}", model_dir.display()));
     }
-    let data = app.path().app_local_data_dir().map_err(|e| e.to_string())?;
-    let audio_dir = data.join("audio");
+    let audio_dir = app.state::<store::Store>().data_dir().join("audio");
     fs::create_dir_all(&audio_dir).map_err(|e| e.to_string())?;
     let id = uuid::Uuid::new_v4().to_string();
     let wav = audio_dir.join(format!("{id}.wav"));
@@ -250,6 +251,11 @@ fn run_worker(
     }
     if child.wait().map_err(|e| e.to_string())?.success() {
         if let Some(value) = result {
+            if preview {
+                fs::remove_file(&wav).map_err(|e| e.to_string())?;
+            } else {
+                app.state::<store::Store>().allow_playback(&app, &wav)?;
+            }
             return Ok(value);
         }
     }
@@ -262,6 +268,37 @@ fn run_worker(
 }
 
 #[tauri::command]
+async fn onboarding_sample(
+    app: tauri::AppHandle,
+    model: String,
+    options: Value,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = app.state::<store::Store>().data_dir().join("setup");
+        fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        let input = dir.join(format!("{}.wav", uuid::Uuid::new_v4()));
+        fs::write(&input, include_bytes!("../../ui/sample_zh.wav")).map_err(|e| e.to_string())?;
+        let started = std::time::Instant::now();
+        let result = run_worker(
+            app,
+            input.to_string_lossy().into_owned(),
+            model,
+            options,
+            true,
+        );
+        let _ = fs::remove_file(input);
+        let mut result = result?;
+        if result["segments"].as_array().is_none_or(Vec::is_empty) {
+            return Err("示例音频未识别出文字，请检查模型或更换运行设备".into());
+        }
+        result["elapsed"] = json!(started.elapsed().as_secs_f64());
+        Ok(result)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 fn store_recording(
     app: tauri::AppHandle,
     request: tauri::ipc::Request<'_>,
@@ -269,16 +306,31 @@ fn store_recording(
     let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
         return Err("录音数据无效".into());
     };
-    let dir = app
-        .path()
-        .app_local_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("recordings");
+    let dir = app.state::<store::Store>().data_dir().join("recordings");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join(format!("{}.webm", uuid::Uuid::new_v4()));
     fs::write(&path, bytes).map_err(|e| e.to_string())?;
     Ok(path.to_string_lossy().into_owned())
 }
+#[tauri::command]
+fn show_startup_window(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.show().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn init_store(app: tauri::AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        static INITIALIZING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _guard = INITIALIZING.lock().map_err(|e| e.to_string())?;
+        if app.try_state::<store::Store>().is_none() {
+            app.manage(store::Store::open(&app)?);
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 fn restore_main(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -365,6 +417,10 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            show_startup_window,
+            init_store,
+            onboarding_sample,
+            store::complete_onboarding,
             pick_files,
             export_file,
             transcribe,
@@ -375,7 +431,16 @@ fn main() {
             feishu::feishu_save_credentials,
             feishu::feishu_publish,
             feishu::feishu_open_document,
+            feishu::feishu_open_permissions,
             store_recording,
+            store::store_load,
+            store::store_save,
+            store::store_delete_records,
+            store::store_kv_get,
+            store::store_kv_set,
+            store::store_kv_delete,
+            store::store_import,
+            store::store_stats,
             models::default_models_dir,
             models::pick_models_dir,
             models::list_local_models,

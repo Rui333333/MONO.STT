@@ -12,7 +12,7 @@ function monoWindowControls(React, jsx) {
     return () => { active = false; unsubscribe.then(stop => stop()); };
   }, []);
   const actions = [
-    ['min', '最小化到托盘', () => win.hide()],
+    ['min', '最小化', () => win.minimize()],
     [maximized ? 'restore' : 'max', maximized ? '还原' : '最大化', () => win.toggleMaximize()],
     ['close', '关闭', () => win.close()]
   ];

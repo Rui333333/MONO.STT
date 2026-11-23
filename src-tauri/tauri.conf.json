@@ -15,16 +15,16 @@
         "height": 680,
         "minWidth": 800,
         "minHeight": 540,
-        "decorations": false
+        "decorations": false,
+        "visible": false,
+        "backgroundColor": "#f4f4f5"
       }
     ],
     "security": {
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost; media-src 'self' blob: asset: http://asset.localhost https://asset.localhost",
       "assetProtocol": {
         "enable": true,
-        "scope": [
-          "$APPLOCALDATA/audio/*.wav"
-        ]
+        "scope": []
       },
       "capabilities": [
         {
@@ -37,8 +37,7 @@
             "core:window:allow-minimize",
             "core:window:allow-toggle-maximize",
             "core:window:allow-close",
-            "core:window:allow-start-dragging",
-            "core:window:allow-hide"
+            "core:window:allow-start-dragging"
           ]
         }
       ]
