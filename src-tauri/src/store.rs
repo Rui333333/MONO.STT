@@ -101,7 +101,11 @@ impl Store {
         let resolved = fs::canonicalize(path).ok()?;
         let parent = resolved.parent()?;
         for root in [&self.data_dir, &self.legacy_dir] {
-            for (folder, extension) in [("audio", "wav"), ("recordings", "webm")] {
+            for (folder, extension) in [
+                ("audio", "wav"),
+                ("recordings", "webm"),
+                ("recordings", "wav"),
+            ] {
                 if fs::canonicalize(root.join(folder)).ok().as_deref() == Some(parent)
                     && resolved.extension()?.eq_ignore_ascii_case(extension)
                     && uuid::Uuid::parse_str(resolved.file_stem()?.to_str()?).is_ok()
@@ -143,13 +147,12 @@ impl Store {
             if source.starts_with(root) {
                 continue;
             }
-            let folder =
-                self.data_dir
-                    .join(if source.extension().unwrap().eq_ignore_ascii_case("wav") {
-                        "audio"
-                    } else {
-                        "recordings"
-                    });
+            let folder = self.data_dir.join(
+                source
+                    .parent()
+                    .and_then(Path::file_name)
+                    .expect("owned audio directory"),
+            );
             fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
             let dest = folder.join(source.file_name().unwrap());
             if !dest.exists() {
@@ -627,12 +630,14 @@ mod tests {
         let data_dir = root.join("data");
         let legacy_dir = root.join("legacy");
         fs::create_dir_all(legacy_dir.join("audio")).unwrap();
+        fs::create_dir_all(legacy_dir.join("recordings")).unwrap();
         fs::create_dir_all(data_dir.join("recordings")).unwrap();
         let id = uuid::Uuid::new_v4();
         let legacy_audio = legacy_dir.join("audio").join(format!("{id}.wav"));
         let imported = root.join(format!("{id}.wav"));
         let recording = data_dir.join("recordings").join(format!("{id}.webm"));
-        for path in [&legacy_audio, &imported, &recording] {
+        let legacy_recording = legacy_dir.join("recordings").join(format!("{id}.wav"));
+        for path in [&legacy_audio, &imported, &recording, &legacy_recording] {
             fs::write(path, b"test media").unwrap();
         }
 
@@ -646,7 +651,11 @@ mod tests {
         {
             let mut conn = store.conn.lock().unwrap();
             let tx = conn.transaction().unwrap();
-            for (id, source) in [("a", &imported), ("b", &recording)] {
+            for (id, source) in [
+                ("a", &imported),
+                ("b", &recording),
+                ("c", &legacy_recording),
+            ] {
                 let mut record = json!({"id":id,"audioPath":legacy_audio,"sourcePath":source,
                     "notes":"keep these notes","segments":[{"id":"seg","text":"test","speaker":"A"}]});
                 store.relocate_record(&tx, &mut record).unwrap();
@@ -659,7 +668,9 @@ mod tests {
             assert_eq!(snapshot["records"][0]["segments"][0]["speaker"], "A");
         }
         let relocated = store.data_dir.join("audio").join(format!("{id}.wav"));
+        let relocated_recording = store.data_dir.join("recordings").join(format!("{id}.wav"));
         assert!(!legacy_audio.exists() && relocated.exists());
+        assert!(!legacy_recording.exists() && relocated_recording.exists());
         assert_eq!(
             delete_records(&store, vec!["a".into()]).unwrap()["pendingFiles"],
             json!([])
@@ -669,7 +680,12 @@ mod tests {
             delete_records(&store, vec!["b".into()]).unwrap()["pendingFiles"],
             json!([])
         );
-        assert!(!relocated.exists() && !recording.exists() && imported.exists());
+        assert!(relocated.exists() && !recording.exists() && imported.exists());
+        assert_eq!(
+            delete_records(&store, vec!["c".into()]).unwrap()["pendingFiles"],
+            json!([])
+        );
+        assert!(!relocated.exists() && !relocated_recording.exists() && imported.exists());
         assert_eq!(
             read_all(&store.conn.lock().unwrap()).unwrap()["records"],
             json!([])

@@ -2,6 +2,7 @@
 
 mod feishu;
 mod models;
+mod recording;
 mod store;
 
 use serde_json::{json, Value};
@@ -381,6 +382,7 @@ fn main() {
     tauri::Builder::default()
         .manage(feishu::FeishuPublish::default())
         .manage(models::ModelDownloads::default())
+        .manage(recording::Recorder::default())
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             restore_main(app)
         }))
@@ -433,6 +435,10 @@ fn main() {
             feishu::feishu_open_document,
             feishu::feishu_open_permissions,
             store_recording,
+            recording::start_native_recording,
+            recording::native_recording_level,
+            recording::stop_native_recording,
+            recording::discard_native_recording,
             store::store_load,
             store::store_save,
             store::store_delete_records,

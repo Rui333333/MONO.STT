@@ -1,5 +1,5 @@
 function createFeishuExport(React, jsx) {
-  return function FeishuExport({recordId, title, exportText}) {
+  return function FeishuExport({recordId, title, exportText, menuItem = false}) {
     const dialog = React.useRef(null);
     const [status, setStatus] = React.useState(null);
     const [settingsOpen, showSettings] = React.useState(false);
@@ -118,7 +118,8 @@ function createFeishuExport(React, jsx) {
     }
 
     return jsx(React.Fragment, {children:[
-      action('飞书', {className:'feishu-export-trigger', onClick:open, title:'发布到飞书云文档'}),
+      action(menuItem ? '发布到飞书' : '飞书', {className:menuItem ? 'reading-export-format' : 'feishu-export-trigger',
+        onClick:open, title:'发布到飞书云文档', 'aria-label':'发布到飞书云文档'}),
       jsx('dialog', {
         ref:dialog, className:'feishu-dialog', 'aria-labelledby':'feishu-export-heading',
         onCancel:event => {

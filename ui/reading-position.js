@@ -149,7 +149,7 @@ function createReadingTimeline(React, jsx, formatTime, DeleteIcon) {
         ]}),
         canRemove && jsx('button', {
           type:'button', onClick:() => actions.current.remove(segment.id), 'aria-label':'删除段落',
-          className:'opacity-0 group-hover:opacity-60 hover:!opacity-100 p-1 text-neutral-500 transition-opacity shrink-0',
+          className:'reading-row-delete p-1 text-neutral-500 transition-opacity shrink-0',
           children:jsx(DeleteIcon,{className:'w-3.5 h-3.5'}),
         }),
       ],
@@ -243,4 +243,82 @@ function createReadingPreview(React, jsx, markdown, plaintext) {
     return chunks;
   }, (previous, next) => !next.visible ||
     (previous.record === next.record && previous.options === next.options && previous.format === next.format));
+}
+
+function createReadingMenu(React, jsx, icons) {
+  const formats = [['txt', '纯文本 (.txt)'], ['markdown', 'Markdown (.md)'], ['srt', '字幕 (.srt)']];
+  const options = [
+    ['includeMetadata', '包含元数据头'],
+    ['includeTimestamps', '保留时间戳'],
+    ['includeSpeakers', '保留说话人'],
+  ];
+
+  return function ReadingMenu({starred, onStar, copied, onCopy, feishu, exportOptions, onOptions, onExport}) {
+    const [open, setOpen] = React.useState(false);
+    const menu = React.useRef(null);
+    const trigger = React.useRef(null);
+    const panelId = React.useId();
+
+    React.useEffect(() => {
+      if (!open) return;
+      const dismissOutside = event => {
+        if (!menu.current?.contains(event.target)) setOpen(false);
+      };
+      const escape = event => {
+        if (event.key === 'Escape' && !document.querySelector('dialog[open]')) {
+          setOpen(false);
+          trigger.current?.focus();
+        }
+      };
+      document.addEventListener('pointerdown', dismissOutside);
+      document.addEventListener('keydown', escape);
+      return () => {
+        document.removeEventListener('pointerdown', dismissOutside);
+        document.removeEventListener('keydown', escape);
+      };
+    }, [open]);
+
+    function iconButton(label, Icon, props) {
+      return jsx('button', {
+        type:'button', className:'reading-export-format reading-menu-action',
+        ...props,
+        children:[
+          jsx(Icon, {className:'reading-tool-icon', 'aria-hidden':true,
+            strokeWidth:1.65,
+            fill:Icon === icons.star && starred ? 'currentColor' : 'none'}),
+          jsx('span',{children:label}),
+        ],
+      });
+    }
+
+    return jsx('div', {ref:menu,className:'reading-export',children:[
+      jsx('button', {
+        type:'button',className:'reading-more-trigger',ref:trigger, onClick:()=>setOpen(value=>!value),
+        'aria-expanded':open,'aria-controls':panelId,children:'更多操作',
+      }),
+      jsx('span',{className:'reading-tool-status',role:'status',children:copied ? '已复制到剪贴板' : ''}),
+      open && jsx('div',{id:panelId,className:'reading-export-panel',children:[
+          jsx('div',{className:'reading-menu-common',children:[
+            iconButton(starred ? '取消收藏' : '收藏记录', icons.star, {onClick:onStar, 'aria-pressed':starred}),
+            iconButton(copied ? '已复制' : '复制', copied ? icons.check : icons.copy, {onClick:onCopy}),
+            feishu,
+          ]}),
+          ...formats.map(([format,label])=>jsx('button',{
+            type:'button',className:'reading-export-format',onClick:()=>{
+              setOpen(false);
+              trigger.current?.focus();
+              onExport(format);
+            },children:'导出'+label,
+          },format)),
+          jsx('fieldset',{className:'reading-export-options',children:[
+            jsx('legend',{children:'导出选项'}),
+            ...options.map(([name,label])=>jsx('label',{children:[
+              jsx('span',{children:label}),
+              jsx('input',{type:'checkbox',checked:exportOptions[name],
+                onChange:event=>onOptions({...exportOptions,[name]:event.target.checked})}),
+            ]},name)),
+          ]}),
+        ]}),
+    ]});
+  };
 }

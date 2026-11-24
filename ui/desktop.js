@@ -32,6 +32,7 @@ const desktop = (() => {
   }
   async function paths(files) {
     return Promise.all(files.map(async f=>typeof f==='string' ? {path:f,name:f.split(/[\\/]/).pop()} :
+      typeof f.path==='string' ? {path:f.path,name:f.name} :
       {path:await invoke('store_recording',new Uint8Array(await f.arrayBuffer())),name:f.name}));
   }
   return {invoke,prepare,load,save,run,paths};
