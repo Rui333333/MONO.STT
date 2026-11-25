@@ -401,7 +401,7 @@ fn main() {
             let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&open, &quit])?;
             TrayIconBuilder::with_id("main-tray")
-                .icon(tauri::include_image!("icons/32x32.png"))
+                .icon(tauri::include_image!("icons/tray.png"))
                 .tooltip("MONO.STT")
                 .menu(&menu)
                 .show_menu_on_left_click(false)

@@ -44,6 +44,7 @@ struct Installer {
     running: AtomicBool,
     prepared: Mutex<Option<Prepared>>,
     installed_to: Mutex<Option<PathBuf>>,
+    uninstall_launcher: Option<u32>,
 }
 
 fn emit(progress: &Channel<Progress>, phase: &'static str, percent: Option<u64>) {
@@ -214,10 +215,17 @@ fn apply(
     let (mut file, parts) = package::open(bundle).map_err(|e| e.to_string())?;
     package::copy(&mut file, parts.stub, &incoming.join(system::MAINTENANCE))
         .map_err(|e| e.to_string())?;
+    package::copy(&mut file, parts.gui, &incoming.join(system::UNINSTALL_UI))
+        .map_err(|e| e.to_string())?;
     progress("close", None);
     system::close_app(directory)?;
 
-    let names = [system::EXE, "runtime", system::MAINTENANCE];
+    let names = [
+        system::EXE,
+        "runtime",
+        system::MAINTENANCE,
+        system::UNINSTALL_UI,
+    ];
     let mut moved_old = Vec::new();
     let mut moved_new = Vec::new();
     let result = (|| {
@@ -282,7 +290,7 @@ async fn choose_directory(app: AppHandle) -> Result<Option<PathBuf>, String> {
     let (sender, receiver) = std::sync::mpsc::sync_channel(1);
     app.dialog()
         .file()
-        .set_title("选择 MONO.STT 安装目录")
+        .set_title("选择 MONO.STT 的安装位置")
         .pick_folder(move |path| {
             let _ = sender.send(path.and_then(|path| path.into_path().ok()));
         });
@@ -295,7 +303,7 @@ async fn choose_directory(app: AppHandle) -> Result<Option<PathBuf>, String> {
 fn set_page(window: tauri::WebviewWindow, page: String) -> Result<(), String> {
     let size = match page.as_str() {
         "loading" => LogicalSize::new(365.0, 132.0),
-        "confirm" => LogicalSize::new(450.0, 264.0),
+        "confirm" | "uninstall" => LogicalSize::new(450.0, 264.0),
         "start" | "progress" | "complete" => LogicalSize::new(950.0, 535.0),
         _ => return Err("未知安装页面".into()),
     };
@@ -310,6 +318,29 @@ fn reveal_loading(window: tauri::WebviewWindow) -> Result<(), String> {
     window.show().map_err(|error| error.to_string())?;
     let _ = window.set_focus();
     Ok(())
+}
+
+#[tauri::command]
+fn uninstall_details(state: State<'_, Installer>) -> Option<PathBuf> {
+    state.uninstall_launcher?;
+    state.requested.clone()
+}
+
+#[tauri::command]
+async fn uninstall_app(app: AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<Installer>();
+        let launcher = state.uninstall_launcher.ok_or("当前窗口没有启动卸载")?;
+        let directory = state.requested.as_deref().ok_or("无法定位安装目录")?;
+        if state.running.swap(true, Ordering::AcqRel) {
+            return Err("卸载正在进行。".into());
+        }
+        let result = system::uninstall(directory, launcher);
+        state.running.store(false, Ordering::Release);
+        result
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -398,15 +429,39 @@ fn main() {
         .windows(2)
         .find(|pair| pair[0] == "--package")
         .map(|pair| PathBuf::from(&pair[1]));
-    let Some(bundle) = bundle else {
-        return;
-    };
     let restart = has("/r");
     let requested = args
         .windows(2)
         .find(|pair| pair[0] == "--directory")
         .map(|pair| PathBuf::from(&pair[1]));
+    let uninstall_launcher = if has("--uninstall") {
+        let launcher = args
+            .windows(2)
+            .find(|pair| pair[0] == "--launcher")
+            .and_then(|pair| pair[1].to_str())
+            .and_then(|value| value.parse::<u32>().ok());
+        if launcher.is_none() || requested.is_none() {
+            process::exit(1);
+        }
+        launcher
+    } else {
+        None
+    };
+    if bundle.is_none() && uninstall_launcher.is_none() {
+        if args.is_empty() {
+            open_installed_uninstaller();
+        }
+        return;
+    }
+    let bundle = bundle.unwrap_or_default();
     if has("/s") || has("/quiet") {
+        if let (Some(launcher), Some(directory)) = (uninstall_launcher, requested.as_deref()) {
+            process::exit(if system::uninstall(directory, launcher).is_ok() {
+                0
+            } else {
+                1
+            });
+        }
         let exit = (|| {
             let prepared = unpack(&bundle, |_| {})?;
             let _lock = system::install_lock()?;
@@ -432,6 +487,7 @@ fn main() {
             running: AtomicBool::new(false),
             prepared: Mutex::new(None),
             installed_to: Mutex::new(None),
+            uninstall_launcher,
         })
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
@@ -460,11 +516,35 @@ fn main() {
             set_page,
             reveal_loading,
             install,
+            uninstall_details,
+            uninstall_app,
             elevate,
             finish
         ])
         .run(tauri::generate_context!())
         .expect("无法打开安装程序");
+}
+
+fn open_installed_uninstaller() {
+    let Ok(executable) = env::current_exe() else {
+        return;
+    };
+    if !executable
+        .file_name()
+        .is_some_and(|name| name.eq_ignore_ascii_case(std::ffi::OsStr::new(system::UNINSTALL_UI)))
+    {
+        return;
+    }
+    if let Err(error) = Command::new(executable.with_file_name(system::MAINTENANCE))
+        .arg("--uninstall")
+        .spawn()
+    {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{MB_ICONERROR, MB_OK};
+        system::message(
+            &format!("无法打开 MONO.STT 卸载程序：{error}"),
+            MB_OK | MB_ICONERROR,
+        );
+    }
 }
 
 #[cfg(test)]
@@ -618,5 +698,31 @@ mod tests {
                 .file_name()
                 .to_string_lossy()
                 .starts_with(".mono-install-")));
+        assert_eq!(
+            fs::read(directory.join(system::UNINSTALL_UI)).unwrap(),
+            b"2"
+        );
+        system::uninstall(&directory, process::id()).unwrap();
+        for name in [
+            system::EXE,
+            "runtime",
+            system::MAINTENANCE,
+            system::UNINSTALL_UI,
+        ] {
+            assert!(!directory.join(name).exists(), "uninstall left {name}");
+        }
+        assert!(system::installed().is_none());
+        assert!(!root
+            .path()
+            .join(r"Microsoft\Windows\Start Menu\Programs\MONO.STT.lnk")
+            .exists());
+        assert_eq!(
+            fs::read(directory.join("data/mono.db")).unwrap(),
+            b"records"
+        );
+        assert_eq!(
+            fs::read(directory.join("models/local-model")).unwrap(),
+            b"model"
+        );
     }
 }

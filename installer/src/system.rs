@@ -12,9 +12,9 @@ use windows::{
     Win32::{
         System::Com::{
             CoCreateInstance, CoInitializeEx, CoUninitialize, IPersistFile, CLSCTX_INPROC_SERVER,
-            COINIT_APARTMENTTHREADED,
+            COINIT_APARTMENTTHREADED, STGM_READ,
         },
-        UI::Shell::{IShellLinkW, ShellLink},
+        UI::Shell::{IShellLinkW, ShellLink, SLGP_RAWPATH},
     },
 };
 use windows_sys::Win32::{
@@ -52,6 +52,7 @@ const WEBVIEW_MACHINE: &str =
     r"Software\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}";
 pub const EXE: &str = "mono-stt.exe";
 pub const MAINTENANCE: &str = "mono-stt-maintenance.exe";
+pub const UNINSTALL_UI: &str = "mono-stt-uninstall-ui.exe";
 
 #[derive(Clone, serde::Serialize)]
 pub struct Installed {
@@ -172,6 +173,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn fresh_install_accepts_local_signing_folder_only_at_default_path() {
+        let root = tempfile::tempdir().unwrap();
+        let default = root.path().join("MONO.STT");
+        let custom = root.path().join("Other");
+        fs::create_dir_all(default.join("Signing")).unwrap();
+        fs::create_dir_all(default.join("data")).unwrap();
+        fs::create_dir_all(custom.join("Signing")).unwrap();
+
+        assert!(check_fresh_directory(&default, &default).is_ok());
+        assert!(check_fresh_directory(&custom, &default)
+            .unwrap_err()
+            .contains("Signing"));
+        fs::write(default.join("unrelated.txt"), []).unwrap();
+        assert!(check_fresh_directory(&default, &default)
+            .unwrap_err()
+            .contains("unrelated.txt"));
+    }
+
+    #[test]
     fn installed_directory_accepts_quoted_paths_and_skips_stale_entries() {
         let temp = tempfile::tempdir().unwrap();
         let directory = temp.path().join("old MONO.STT");
@@ -237,18 +257,32 @@ pub fn target(requested: Option<&Path>, previous: Option<&Installed>) -> Result<
         return Err("ELEVATION_REQUIRED".into());
     }
     if previous.is_none() && directory.exists() {
-        let files = fs::read_dir(&directory).map_err(|e| format!("无法读取安装目录：{e}"))?;
-        for file in files {
-            let name = file.map_err(|e| e.to_string())?.file_name();
-            if !["data", "models", MAINTENANCE]
-                .iter()
-                .any(|allowed| name == *allowed)
-            {
-                return Err("所选目录有其他文件。请选择空目录或新建一个 MONO.STT 文件夹。".into());
-            }
-        }
+        check_fresh_directory(&directory, &default_directory()?)?;
     }
     Ok(directory)
+}
+
+fn check_fresh_directory(directory: &Path, default: &Path) -> Result<(), String> {
+    let default_location = same_path(directory, default);
+    let files = fs::read_dir(directory).map_err(|e| format!("无法读取安装目录：{e}"))?;
+    for entry in files {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let name = entry.file_name();
+        let known = ["data", "models", MAINTENANCE]
+            .iter()
+            .any(|allowed| name == *allowed);
+        // The Windows build script keeps the local updater signing material here.
+        let signing = default_location
+            && name == "Signing"
+            && entry.file_type().is_ok_and(|kind| kind.is_dir());
+        if !known && !signing {
+            return Err(format!(
+                "安装目录包含「{}」。请选择另一个安装位置。",
+                name.to_string_lossy()
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn protected_directory(directory: &Path) -> bool {
@@ -335,11 +369,15 @@ pub fn elevate(package: &Path, directory: Option<&Path>) -> Result<(), String> {
             path.trim_end_matches(['\\', '/'])
         ));
     }
+    run_elevated(package, &arguments)
+}
+
+fn run_elevated(executable: &Path, arguments: &str) -> Result<(), String> {
     let result = unsafe {
         ShellExecuteW(
             null_mut(),
             wide("runas").as_ptr(),
-            wide(package).as_ptr(),
+            wide(executable).as_ptr(),
             wide(arguments).as_ptr(),
             null(),
             SW_SHOWNORMAL,
@@ -472,18 +510,22 @@ fn desktop_path() -> Result<PathBuf, String> {
     Ok(PathBuf::from(text.map_err(|e| e.to_string())?).join("MONO.STT.lnk"))
 }
 
-fn create_shortcut(directory: &Path, link: &Path) -> Result<(), String> {
-    struct Apartment;
-    impl Drop for Apartment {
-        fn drop(&mut self) {
-            unsafe { CoUninitialize() };
-        }
+struct ShortcutApartment;
+impl Drop for ShortcutApartment {
+    fn drop(&mut self) {
+        unsafe { CoUninitialize() };
     }
+}
+impl ShortcutApartment {
+    fn enter() -> windows::core::Result<Self> {
+        unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED).ok()? };
+        Ok(Self)
+    }
+}
+
+fn create_shortcut(directory: &Path, link: &Path) -> Result<(), String> {
+    let _apartment = ShortcutApartment::enter().map_err(|e| e.to_string())?;
     unsafe {
-        CoInitializeEx(None, COINIT_APARTMENTTHREADED)
-            .ok()
-            .map_err(|e| e.to_string())?;
-        let _apartment = Apartment;
         let shell: IShellLinkW =
             CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER).map_err(|e| e.to_string())?;
         shell
@@ -499,44 +541,130 @@ fn create_shortcut(directory: &Path, link: &Path) -> Result<(), String> {
     }
 }
 
+fn shortcut_points_to(link: &Path, executable: &Path) -> windows::core::Result<bool> {
+    let _apartment = ShortcutApartment::enter()?;
+    unsafe {
+        let shell: IShellLinkW = CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER)?;
+        let persist: IPersistFile = shell.cast()?;
+        persist.Load(PCWSTR(wide(link).as_ptr()), STGM_READ)?;
+        let mut destination = [0u16; 32768];
+        shell.GetPath(&mut destination, null_mut(), SLGP_RAWPATH.0 as u32)?;
+        let length = destination
+            .iter()
+            .position(|part| *part == 0)
+            .unwrap_or(destination.len());
+        Ok(length != 0
+            && same_path(
+                Path::new(&String::from_utf16_lossy(&destination[..length])),
+                executable,
+            ))
+    }
+}
+
 pub fn register(directory: &Path, version: &str) -> Result<(), String> {
     let path = directory.to_string_lossy();
     let command = format!("\"{}\" --uninstall", directory.join(MAINTENANCE).display());
+    let quiet = format!("{command} /quiet");
     let icon = directory.join(EXE);
     reg_set(
         UNINSTALL,
         &[
             ("DisplayName", "MONO.STT"),
             ("DisplayVersion", version),
-            ("Publisher", "inkvoice"),
+            ("Publisher", "Rui333"),
             ("InstallLocation", &path),
             ("DisplayIcon", &icon.to_string_lossy()),
             ("UninstallString", &command),
+            ("QuietUninstallString", &quiet),
         ],
     )?;
     reg_set(LOCATION, &[("", &path)])
 }
 
-pub fn uninstall(directory: &Path) -> Result<(), String> {
-    let _lock = install_lock()?;
-    let registered = installed().ok_or("没有检测到已注册的 MONO.STT 安装")?;
-    if !same_path(directory, &registered.directory) {
+pub fn check_uninstall(directory: &Path) -> Result<(), String> {
+    let registered = reg_get(HKEY_CURRENT_USER, UNINSTALL, "InstallLocation")
+        .map(|path| PathBuf::from(path.trim().trim_matches('"')))
+        .ok_or("没有检测到已注册的 MONO.STT 安装")?;
+    if !registered.is_absolute()
+        || !same_path(directory, &registered)
+        || !directory.join(MAINTENANCE).is_file()
+    {
         return Err("卸载程序所在路径与已注册安装不匹配。".into());
     }
+    if protected_directory(directory) && unsafe { IsUserAnAdmin() } == 0 {
+        return Err("ELEVATION_REQUIRED".into());
+    }
+    Ok(())
+}
+
+pub fn elevate_uninstall(executable: &Path) -> Result<(), String> {
+    run_elevated(
+        executable,
+        &format!("--uninstall --account {}", current_sid()?),
+    )
+}
+
+pub fn retired_uninstaller(directory: &Path, launcher: u32) -> PathBuf {
+    directory.join(format!(".mono-stt-uninstalled-{launcher}.exe"))
+}
+
+pub fn clean_retired_uninstaller(directory: &Path, launcher: u32) -> Result<(), String> {
+    let path = retired_uninstaller(directory, launcher);
+    windows_utility("WindowsPowerShell/v1.0/powershell.exe")?
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            r#"
+            Wait-Process -Id ([int]$env:MONO_UNINSTALL_LAUNCHER) -ErrorAction SilentlyContinue
+            $file = $env:MONO_UNINSTALL_RETIRED
+            if ([IO.File]::Exists($file)) {
+                [IO.File]::Delete($file)
+                try { [IO.Directory]::Delete([IO.Path]::GetDirectoryName($file), $false) } catch { }
+            }
+        "#,
+        ])
+        .env("MONO_UNINSTALL_LAUNCHER", launcher.to_string())
+        .env("MONO_UNINSTALL_RETIRED", path)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("无法启动卸载后清理：{e}"))
+}
+
+pub fn uninstall(directory: &Path, launcher: u32) -> Result<(), String> {
+    let _lock = install_lock()?;
+    check_uninstall(directory)?;
     close_app(directory)?;
     fs::remove_dir_all(directory.join("runtime"))
         .or_else(ignore_missing)
         .map_err(|e| e.to_string())?;
-    fs::remove_file(directory.join(EXE))
-        .or_else(ignore_missing)
-        .map_err(|e| e.to_string())?;
-    fs::remove_file(shortcut_path()?)
-        .or_else(ignore_missing)
-        .map_err(|e| e.to_string())?;
-    if let Ok(shortcut) = desktop_path() {
-        let _ = fs::remove_file(shortcut);
+    let executable = directory.join(EXE);
+    for shortcut in [Some(shortcut_path()?), desktop_path().ok()]
+        .into_iter()
+        .flatten()
+    {
+        if shortcut.is_file() && shortcut_points_to(&shortcut, &executable).unwrap_or(false) {
+            fs::remove_file(shortcut)
+                .or_else(ignore_missing)
+                .map_err(|e| e.to_string())?;
+        }
     }
-    for key in [UNINSTALL, LOCATION] {
+    fs::remove_file(executable)
+        .or_else(ignore_missing)
+        .map_err(|e| e.to_string())?;
+    let maintenance = directory.join(MAINTENANCE);
+    let retired = retired_uninstaller(directory, launcher);
+    fs::rename(&maintenance, &retired).map_err(|e| format!("无法移除卸载程序：{e}"))?;
+    if let Err(error) = remove_registration() {
+        let _ = fs::rename(&retired, &maintenance);
+        return Err(error);
+    }
+    let _ = fs::remove_file(directory.join(UNINSTALL_UI));
+    Ok(())
+}
+
+fn remove_registration() -> Result<(), String> {
+    for key in [LOCATION, UNINSTALL] {
         let result = unsafe { RegDeleteTreeW(HKEY_CURRENT_USER, wide(key).as_ptr()) };
         if result != 0 && result != ERROR_FILE_NOT_FOUND {
             return Err(io::Error::from_raw_os_error(result as i32).to_string());

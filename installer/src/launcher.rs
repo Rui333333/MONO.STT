@@ -3,7 +3,7 @@
 use mono_stt_installer::{package, system};
 
 use std::{
-    env,
+    env, fs,
     path::Path,
     process::{self, Command},
 };
@@ -27,19 +27,52 @@ fn run() -> Result<i32, String> {
             return Err("请使用同一个 Windows 账号授权，确保应用和数据仍属于当前用户。".into());
         }
     }
+    let silent = flag("/s") || flag("/quiet");
     if flag("--uninstall") {
-        if !flag("/s")
-            && system::message(
-                "卸载 MONO.STT？已有转录记录和模型会保留。",
+        let directory = setup.parent().ok_or("无法定位安装目录")?;
+        if let Err(error) = system::check_uninstall(directory) {
+            if error == "ELEVATION_REQUIRED" && !silent {
+                system::elevate_uninstall(&setup)?;
+                return Ok(0);
+            }
+            return Err(error);
+        }
+        let temporary = system::setup_temp()?;
+        let gui = temporary.path().join(system::UNINSTALL_UI);
+        fs::copy(directory.join(system::UNINSTALL_UI), &gui)
+            .map_err(|e| format!("找不到可用的卸载界面，请重新安装后再卸载：{e}"))?;
+        let launcher = process::id();
+        if system::retired_uninstaller(directory, launcher).exists() {
+            return Err("卸载清理路径已被占用，请重试。".into());
+        }
+        let mut command = Command::new(gui);
+        command
+            .arg("--uninstall")
+            .arg("--directory")
+            .arg(directory)
+            .arg("--launcher")
+            .arg(launcher.to_string());
+        if silent {
+            command.arg("/quiet");
+        } else if !system::webview_installed() {
+            if system::message(
+                "卸载 MONO.STT？转录记录、设置和模型会保留。",
                 MB_YESNO | MB_ICONQUESTION,
             ) != IDYES
-        {
-            return Ok(1);
+            {
+                return Ok(1);
+            }
+            command.arg("/quiet");
         }
-        system::uninstall(setup.parent().ok_or("无法定位安装目录")?)?;
-        return Ok(0);
+        system::clean_retired_uninstaller(directory, launcher)?;
+        let status = command
+            .status()
+            .map_err(|e| format!("无法启动卸载程序：{e}"))?;
+        if !status.success() && !silent {
+            return Err("卸载未完成，请重试。".into());
+        }
+        return Ok(status.code().unwrap_or(1));
     }
-    let silent = flag("/s") || flag("/quiet");
     let (mut package_file, parts) = package::open(&setup).map_err(|e| e.to_string())?;
     let temp = system::setup_temp()?;
 

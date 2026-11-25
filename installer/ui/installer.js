@@ -16,10 +16,10 @@ let elevationDirectory = null;
 function show(next) {
   stage = next;
   artwork.dataset.state = next;
-  const small = ['loading','confirm','cancelled'].includes(next);
+  const small = ['loading','confirm','cancelled','uninstall'].includes(next);
   preflight.hidden = !small;
   activeArea.hidden = small;
-  for (const [panel, route] of [['loader','loading'],['confirm','confirm'],['cancelled','cancelled']]) {
+  for (const [panel, route] of [['loader','loading'],['confirm','confirm'],['cancelled','cancelled'],['uninstall','uninstall']]) {
     element(panel).hidden = next !== route;
   }
   const installing = next === 'progress';
@@ -56,18 +56,27 @@ function percent(group, value) {
   }
 }
 
-function fail(error, directory = null) {
+function fail(error, directory = null, chooseAgain = false) {
   const needsElevation = error === 'ELEVATION_REQUIRED';
   elevationDirectory = directory;
   element('elevate').hidden = !needsElevation;
+  element('choose-again').hidden = !chooseAgain;
   element('load-error').textContent = needsElevation ?
     '这个安装位置需要管理员权限。请用当前 Windows 账号授权。' : String(error);
   element('cancelled-title').textContent = '安装未完成';
   return show('cancelled');
 }
 
+function installationDirectory() {
+  const location = path.value.trim();
+  if (location === info?.default_directory || !/[\\/]/.test(location)) return location;
+  const directory = location.replace(/[\\/]+$/, '');
+  return /[\\/]MONO\.STT$/i.test(directory) ? directory : directory + '\\MONO.STT';
+}
+
 async function runInstall(overwrite) {
   if (busy) return;
+  const directory = overwrite ? null : installationDirectory();
   busy = true;
   try {
     await show('progress');
@@ -88,13 +97,13 @@ async function runInstall(overwrite) {
       })[step] || '正在安装…';
     });
     await invoke('install',{
-      directory:overwrite ? null : path.value.trim(),
+      directory,
       desktop: element(overwrite ? 'overwrite-desktop' : 'fresh-desktop').checked,
       overwrite, progress:channel,
     });
     await show('complete');
   } catch(error) {
-    await fail(error, overwrite ? null : path.value.trim());
+    await fail(error, directory, !overwrite && !info?.automatic);
   } finally {
     busy = false;
   }
@@ -102,8 +111,17 @@ async function runInstall(overwrite) {
 
 async function prepare() {
   try {
+    const uninstallPath = await invoke('uninstall_details');
+    if (uninstallPath) {
+      element('uninstall-path').textContent = uninstallPath;
+      await show('uninstall');
+      await waitForFirstPaint(element('uninstall').querySelector('img'));
+      await invoke('reveal_loading');
+      element('cancel-uninstall').focus();
+      return;
+    }
     await show('loading');
-    await waitForLoadingPage();
+    await waitForFirstPaint(element('loader').querySelector('img'));
     await invoke('reveal_loading');
     const channel = new Channel(event => percent('load',event.percent));
     info = await invoke('prepare',{progress:channel});
@@ -124,8 +142,7 @@ async function prepare() {
   }
 }
 
-async function waitForLoadingPage() {
-  const image = element('loader').querySelector('img');
+async function waitForFirstPaint(image) {
   await Promise.race([
     image.decode().catch(() => {}),
     new Promise(resolve => setTimeout(resolve, 600)),
@@ -137,11 +154,46 @@ async function waitForLoadingPage() {
   ]);
 }
 
+async function runUninstall() {
+  if (busy) return;
+  busy = true;
+  const remove = element('remove-app');
+  const cancel = element('cancel-uninstall');
+  const dismiss = element('uninstall').querySelector('[data-close]');
+  const error = element('uninstall-error');
+  for (const button of [remove, cancel, dismiss]) button.disabled = true;
+  error.hidden = true;
+  remove.textContent = '正在卸载…';
+  try {
+    await invoke('uninstall_app');
+    element('uninstall-title').textContent = '卸载完成';
+    element('uninstall-detail').textContent = '转录记录、设置和模型已保留。';
+    cancel.hidden = true;
+    remove.textContent = '完成';
+    remove.onclick = () => close();
+  } catch (failure) {
+    error.textContent = String(failure);
+    error.hidden = false;
+    remove.textContent = '重试卸载';
+  } finally {
+    busy = false;
+    for (const button of [remove, cancel, dismiss]) button.disabled = false;
+    remove.focus();
+  }
+}
+
 function close(launch = false) {
   if (!busy) invoke('finish',{launch}).catch(fail);
 }
 for(const button of document.querySelectorAll('[data-close]')) button.onclick = () => close();
 element('cancel-overwrite').onclick = () => close();
+element('cancel-uninstall').onclick = () => close();
+element('remove-app').onclick = runUninstall;
+element('choose-again').onclick = async () => {
+  await show('start');
+  element('directory').open = true;
+  path.focus();
+};
 element('overwrite').onclick = () => runInstall(true);
 element('elevate').onclick = async () => {
   try {

@@ -20,9 +20,20 @@
         <button class="primary" type="button" id="overwrite">确认覆盖</button>
       </div>
     </section>
+    <section class="preflight-card confirm" id="uninstall" aria-labelledby="uninstall-title" hidden>
+      <div class="brand-pair" data-tauri-drag-region><img class="small-art" src="installer.png" alt="">MONO.STT<button class="window-close" type="button" data-close aria-label="关闭">×</button></div>
+      <h2 id="uninstall-title" tabindex="-1">卸载 MONO.STT？</h2>
+      <p id="uninstall-detail">卸载会移除应用及快捷方式，保留转录记录、设置和模型。</p>
+      <p class="uninstall-path" id="uninstall-path"></p>
+      <p id="uninstall-error" role="alert" hidden></p>
+      <div class="confirm-actions">
+        <button class="secondary" type="button" id="cancel-uninstall">取消</button>
+        <button class="primary" type="button" id="remove-app">确认卸载</button>
+      </div>
+    </section>
     <section class="preflight-card cancelled" id="cancelled" aria-labelledby="cancelled-title" hidden>
       <h2 id="cancelled-title" tabindex="-1">无法开始安装</h2>
-      <p><span id="load-error"></span></p><div class="confirm-actions"><button type="button" class="primary" id="elevate" hidden>以管理员身份继续</button><button type="button" class="primary" data-close>关闭</button></div>
+      <p><span id="load-error"></span></p><div class="confirm-actions"><button type="button" class="secondary" id="choose-again" hidden>重新选择目录</button><button type="button" class="primary" id="elevate" hidden>以管理员身份继续</button><button type="button" class="primary" data-close>关闭</button></div>
     </section>
   </div>
   <section class="installer" id="installer" aria-labelledby="headline" hidden>
@@ -36,8 +47,9 @@
         <p id="subtitle">本地音视频转文字</p>
         <details id="directory" class="directory">
           <summary>自定义安装位置</summary>
-          <label for="path">安装目录</label>
-          <div class="path-row"><input id="path" type="text" spellcheck="false" autocomplete="off" aria-describedby="path-error"><button class="secondary" id="browse" type="button">浏览</button></div><label><input id="fresh-desktop" type="checkbox"> 创建桌面快捷方式</label>
+          <label for="path">安装位置</label>
+          <div class="path-row"><input id="path" type="text" spellcheck="false" autocomplete="off" aria-describedby="path-error"><button class="secondary" id="browse" type="button">浏览</button></div>
+          <label><input id="fresh-desktop" type="checkbox"> 创建桌面快捷方式</label>
           <p class="error" id="path-error" role="status" hidden></p>
         </details>
       </div>

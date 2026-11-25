@@ -23,6 +23,9 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid
 .confirm .brand-pair{display:flex;align-items:center;gap:8px;margin-bottom:12px;font-weight:700}
 .confirm .small-art{width:30px;height:30px}
 .confirm p,.cancelled p{color:#595959;margin:6px 0}
+.uninstall-path,#uninstall-error{max-height:46px;overflow:auto;overflow-wrap:anywhere;font-size:12px}
+#uninstall-error{color:#a32323}
+#uninstall{overflow:auto}
 .confirm-actions{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:20px}
 .secondary{background:#fff;border:1px solid #d9d9d9;border-radius:8px;padding:9px 14px}
 .secondary:hover{background:#f3f3f3}
@@ -34,6 +37,7 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid
 .main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.85fr);align-items:center;min-height:352px;padding:32px clamp(25px,7vw,76px);gap:clamp(12px,4vw,40px);flex:1}
 .copy{min-width:0;animation:reveal 220ms ease both}
 .copy h1{font-size:clamp(28px,4.4vw,46px);line-height:1.18;letter-spacing:-.06em;margin:0 0 11px;font-weight:720}
+.copy h1:focus{outline:none}
 .copy p{margin:0;color:#595959;font-size:14px;max-width:32em}
 .art{margin:0;display:grid;place-items:center}
 .art-scene{position:relative;width:min(100%,287px);aspect-ratio:1;isolation:isolate}
