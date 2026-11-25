@@ -78,6 +78,7 @@ fn unpack(bundle: &Path, progress: impl Fn(u64)) -> Result<Prepared, String> {
         let relative = entry.enclosed_name().ok_or("安装资源包含无效路径")?;
         if entry.is_symlink()
             || !(relative == Path::new(system::EXE)
+                || relative == Path::new(system::MAINTENANCE)
                 || relative == Path::new("version.txt")
                 || relative.starts_with("runtime"))
         {
@@ -116,6 +117,7 @@ fn unpack(bundle: &Path, progress: impl Fn(u64)) -> Result<Prepared, String> {
         || !version.split('.').all(|part| part.parse::<u32>().is_ok())
         || !folder.path().join(system::EXE).is_file()
         || !folder.path().join("runtime/python.exe").is_file()
+        || (file.1.signed && !folder.path().join(system::MAINTENANCE).is_file())
     {
         return Err("安装资源缺少应用或运行组件。".into());
     }
@@ -213,8 +215,13 @@ fn apply(
         .map_err(|e| format!("复制安装文件失败：{e}"))?;
     }
     let (mut file, parts) = package::open(bundle).map_err(|e| e.to_string())?;
-    package::copy(&mut file, parts.stub, &incoming.join(system::MAINTENANCE))
-        .map_err(|e| e.to_string())?;
+    let maintenance = prepared.folder.path().join(system::MAINTENANCE);
+    if maintenance.is_file() {
+        fs::copy(maintenance, incoming.join(system::MAINTENANCE)).map_err(|e| e.to_string())?;
+    } else {
+        package::copy(&mut file, parts.stub, &incoming.join(system::MAINTENANCE))
+            .map_err(|e| e.to_string())?;
+    }
     package::copy(&mut file, parts.gui, &incoming.join(system::UNINSTALL_UI))
         .map_err(|e| e.to_string())?;
     progress("close", None);

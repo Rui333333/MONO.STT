@@ -14,6 +14,9 @@ def pack(build: Path, runtime: Path, webview: Path, version: str, output: Path) 
         with zipfile.ZipFile(payload, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
             archive.writestr("version.txt", version)
             archive.write(build / "mono-stt.exe", "mono-stt.exe")
+            maintenance = build / "mono-stt-maintenance.exe"
+            if maintenance.is_file():
+                archive.write(maintenance, maintenance.name)
             for path in sorted(runtime.rglob("*")):
                 if path.is_file():
                     archive.write(path, (Path("runtime") / path.relative_to(runtime)).as_posix())

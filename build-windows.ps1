@@ -1,4 +1,4 @@
-param([switch]$PrepareOnly, [switch]$BundleOnly, [switch]$Slim, [switch]$Signed)
+param([switch]$PrepareOnly, [switch]$BundleOnly, [switch]$Slim, [switch]$Signed, [string]$WindowsSignScript)
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 
@@ -60,6 +60,22 @@ if (-not $BundleOnly) {
 if ($PrepareOnly) { return }
 if (!(Test-Path -LiteralPath (Join-Path $runtime 'python.exe'))) { throw '请先准备 Windows 推理运行库。' }
 
+if ($WindowsSignScript) {
+    $WindowsSignScript = (Resolve-Path -LiteralPath $WindowsSignScript).Path
+    if (![IO.File]::Exists($WindowsSignScript) -or [IO.Path]::GetExtension($WindowsSignScript) -ne '.ps1') {
+        throw 'WindowsSignScript 必须指向一个 PowerShell 签名脚本。'
+    }
+}
+
+function Set-WindowsSignature([string]$FilePath) {
+    & pwsh -NoProfile -NonInteractive -File $WindowsSignScript $FilePath
+    if ($LASTEXITCODE -ne 0) { throw "Windows 代码签名失败：$FilePath" }
+    $signature = Get-AuthenticodeSignature -LiteralPath $FilePath
+    if ($signature.Status -ne 'Valid' -or !$signature.TimeStamperCertificate) {
+        throw "Windows 代码签名无效或缺少时间戳：$FilePath ($($signature.Status))"
+    }
+}
+
 $config = Get-Content -LiteralPath 'src-tauri/tauri.conf.json' -Raw | ConvertFrom-Json
 $previousSigned = $env:MONO_SIGNED_UPDATE_BUILD
 $previousKey = $env:TAURI_SIGNING_PRIVATE_KEY
@@ -116,8 +132,34 @@ try {
     $name = "$($config.productName)_${version}_x64-setup.exe"
     $result = Join-Path $bundle $name
     $build = Join-Path $target 'release'
-    python installer/pack.py $build $runtime $webview $version $result
-    if ($LASTEXITCODE -ne 0) { throw '无法封装 Windows 安装包。' }
+    if ($WindowsSignScript) {
+        # Sign the maintenance launcher separately. The outer launcher is signed after packing.
+        $signStage = (New-Item -ItemType Directory -Path (Join-Path $staging "sign-$([guid]::NewGuid())")).FullName
+        $signedSetup = Join-Path $signStage $name
+        $files = @('mono-stt.exe', 'mono-stt-installer.exe', 'mono-stt-setup.exe')
+        try {
+            foreach ($binary in $files) {
+                Copy-Item -LiteralPath (Join-Path $build $binary) -Destination $signStage
+            }
+            Copy-Item -LiteralPath (Join-Path $signStage 'mono-stt-setup.exe') -Destination (Join-Path $signStage 'mono-stt-maintenance.exe')
+            foreach ($binary in @('mono-stt.exe', 'mono-stt-installer.exe', 'mono-stt-maintenance.exe')) {
+                Set-WindowsSignature (Join-Path $signStage $binary)
+            }
+            python installer/pack.py $signStage $runtime $webview $version $signedSetup
+            if ($LASTEXITCODE -ne 0) { throw '无法封装 Windows 安装包。' }
+            Set-WindowsSignature $signedSetup
+            Move-Item -LiteralPath $signedSetup -Destination $result -Force
+        } finally {
+            foreach ($binary in ($files + @('mono-stt-maintenance.exe', $name))) {
+                $file = Join-Path $signStage $binary
+                if ([IO.File]::Exists($file)) { [IO.File]::Delete($file) }
+            }
+            if (!(Get-ChildItem -LiteralPath $signStage -Force)) { [IO.Directory]::Delete($signStage) }
+        }
+    } else {
+        python installer/pack.py $build $runtime $webview $version $result
+        if ($LASTEXITCODE -ne 0) { throw '无法封装 Windows 安装包。' }
+    }
 
     if ($Signed) {
         $env:npm_config_registry = 'https://registry.npmjs.org'

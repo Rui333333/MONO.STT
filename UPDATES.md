@@ -10,6 +10,18 @@ Windows 安装包把原生启动器、WebView2 引导组件、Tauri 界面和应
 
 从 `src-tauri/target/release/bundle/windows` 取出本次构建的 `*-setup.exe`、对应的 `.sig` 和 `latest.json`，一起上传至和版本号一致的 GitHub Release。例如版本 `0.1.4` 对应标签 `v0.1.4`。可以在发布前把 `latest.json` 的 `notes` 改成这一版的更新说明。
 
+## Windows 发布者签名
+
+`-Signed` 生成 Tauri 更新签名。要让 Windows 验证发布者，需再接入受信任的 Authenticode 签名身份：
+
+```powershell
+pwsh -File .\build-windows.ps1 -Slim -Signed -WindowsSignScript C:\Signing\sign.ps1
+```
+
+签名脚本接收待签 EXE 的绝对路径作为首个参数，调用证书提供方的工具添加 Authenticode 签名和 RFC 3161 时间戳。构建会验证各文件签名，先签主程序、安装界面和维护程序，再封装并签署最终安装包，最后生成 Tauri 更新签名和 `latest.json`。
+
+发布前检查安装包和已安装的主程序、维护程序签名，并实测安装、卸载和自动更新。`Get-AuthenticodeSignature` 应返回 `Valid`。重新签署安装包会改变文件字节，需要重新生成 Tauri 更新签名。新签名的应用仍可能在信誉积累前出现 SmartScreen 提示。
+
 ## 使用 GitHub Actions
 
 在仓库的 Actions Secrets 配置 `TAURI_SIGNING_PRIVATE_KEY`（私钥文件内容）和 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`（私钥密码）。私钥和密码请单独备份。应用已内置对应公钥，后续发布必须沿用同一套密钥。
