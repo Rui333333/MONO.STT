@@ -4,6 +4,7 @@ mod feishu;
 mod models;
 mod recording;
 mod store;
+mod updates;
 
 use serde_json::{json, Value};
 use std::os::windows::process::CommandExt;
@@ -204,6 +205,7 @@ fn run_worker(
     options: Value,
     preview: bool,
 ) -> Result<Value, String> {
+    let _task = updates::task(&app)?;
     if !models::valid_model(&model) {
         return Err("未知模型".into());
     }
@@ -383,10 +385,12 @@ fn main() {
         .manage(feishu::FeishuPublish::default())
         .manage(models::ModelDownloads::default())
         .manage(recording::Recorder::default())
+        .manage(updates::Activity::default())
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             restore_main(app)
         }))
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             #[cfg(windows)]
             if let Some(window) = app.get_webview_window("main") {
@@ -421,6 +425,9 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             show_startup_window,
             init_store,
+            updates::app_update_info,
+            updates::check_app_update,
+            updates::install_app_update,
             onboarding_sample,
             store::complete_onboarding,
             pick_files,

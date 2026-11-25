@@ -1,0 +1,71 @@
+name: Windows release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == 'Rui333333/MONO.STT' && github.ref_type == 'tag'
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check whether the release already exists
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view $env:GITHUB_REF_NAME --repo $env:GITHUB_REPOSITORY --json tagName 2>$null
+          $exists = $LASTEXITCODE -eq 0
+          "exists=$($exists.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          exit 0
+      - uses: actions/checkout@v4
+        if: steps.release.outputs.exists != 'true'
+      - uses: actions/setup-node@v4
+        if: steps.release.outputs.exists != 'true'
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        if: steps.release.outputs.exists != 'true'
+        with:
+          python-version: '3.12'
+      - name: Check version and fetch Rust dependencies
+        if: steps.release.outputs.exists != 'true'
+        run: |
+          $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          if ($version -notmatch '^\d+\.\d+\.\d+$' -or $env:GITHUB_REF_NAME -ne "v$version") {
+            throw 'Tag and Tauri version must match a stable vMAJOR.MINOR.PATCH release.'
+          }
+          $metadata = cargo metadata --no-deps --locked --format-version 1 --manifest-path src-tauri/Cargo.toml | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $metadata.packages[0].version -ne $version) {
+            throw 'Cargo and Tauri versions must match.'
+          }
+          cargo fetch --locked --manifest-path src-tauri/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build and sign the Windows installer
+        if: steps.release.outputs.exists != 'true'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: ./build-windows.ps1 -Slim -Signed
+      - name: Create a draft GitHub Release
+        if: steps.release.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = $env:GITHUB_REF_NAME.Substring(1)
+          $bundle = 'src-tauri/target/release/bundle/nsis'
+          $installer = Join-Path $bundle "MONO.STT_${version}_x64-setup.exe"
+          gh release create $env:GITHUB_REF_NAME $installer "$installer.sig" "$bundle/latest.json" --verify-tag --draft --generate-notes --title "MONO.STT $version"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

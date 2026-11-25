@@ -24,6 +24,16 @@ header[data-tauri-drag-region]>div:first-child,header[data-tauri-drag-region]>di
 .record-confirm audio{width:100%;height:35px}.record-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
 .record-actions button{padding:5px 13px;border:1px solid #8885;border-radius:6px;font-size:13px;cursor:pointer}
 .record-actions button:last-child{background:#171717;color:#fff}.dark .record-confirm{background:#171717;color:#fafafa;border-color:#444}.dark .record-actions button:last-child{background:#fafafa;color:#171717}.dark .record-details{color:#aaa}
+.update-check-button{border:1px solid #8885;border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer}
+.update-check-button:hover{background:#8882}
+.update-dialog .update-version,.update-dialog .update-status{margin:8px 0;font-size:13px;overflow-wrap:anywhere}
+.update-dialog .update-version{color:#737373}
+.dark .update-dialog .update-version{color:#a3a3a3}
+.update-dialog .update-notes{max-height:160px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;border:1px solid #8884;border-radius:7px;padding:8px;margin-block:12px}
+.update-dialog progress{display:block;width:100%;height:8px;margin-block:14px;accent-color:#171717}
+.dark .update-dialog progress{accent-color:#fafafa}
+.update-dialog [hidden]{display:none}
+.update-dialog button:disabled{opacity:.5;cursor:default}
 .transfer-page{height:100%;overflow:auto}.transfer-page>header{height:40px;border-bottom:1px solid #8882;padding:10px 22px;font-size:13px;font-weight:600}.transfer-body{max-width:640px;margin:auto;padding:32px 30px}.transfer-meta{font-size:19px;font-weight:600}.transfer-page button:not(:where(.mono-dropdown-trigger)),.transfer-nav{border:1px solid #8885;border-radius:6px;padding:5px 11px;font-size:12px;color:inherit;cursor:pointer}.transfer-row{border-bottom:1px solid #8883;padding:15px 0;display:grid;gap:6px;justify-items:start;overflow-wrap:anywhere}.transfer-row strong{font-size:14px}.transfer-row small{color:#737373;font-size:12px}.dark .transfer-row small{color:#aaa}.transfer-nav{margin:4px 9px;text-align:left}
 .reading-pane{position:relative}.reading-return{position:absolute;bottom:68px;left:50%;transform:translateX(-50%);border:1px solid #8885;background:#fff;color:#171717;border-radius:20px;padding:7px 14px;font-size:12px;box-shadow:0 2px 9px #0002;white-space:nowrap;cursor:pointer}.dark .reading-return{background:#262626;color:#fafafa}.reading-return:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 

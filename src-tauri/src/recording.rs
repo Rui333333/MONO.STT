@@ -120,6 +120,7 @@ fn open_stream(path: &Path, capture: &Arc<Mutex<Capture>>) -> Result<(cpal::Stre
 #[tauri::command]
 pub async fn start_native_recording(app: AppHandle) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let task = crate::updates::task(&app)?;
         let state = app.state::<Recorder>();
         let mut slot = state.0.lock().map_err(|e| e.to_string())?;
         if slot.is_some() {
@@ -138,6 +139,7 @@ pub async fn start_native_recording(app: AppHandle) -> Result<String, String> {
         thread::Builder::new()
             .name("mono-stt-microphone".into())
             .spawn(move || {
+                let _task = task;
                 let (stream, sample_rate) = match open_stream(&path, &worker_capture) {
                     Ok(value) => value,
                     Err(error) => {

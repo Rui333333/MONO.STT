@@ -93,6 +93,7 @@ pub async fn download_model(
     source: String,
     request_id: String,
 ) -> Result<bool, String> {
+    let task = crate::updates::task(&app)?;
     let (_, repo) = MODELS
         .iter()
         .find(|(id, _)| *id == model)
@@ -115,6 +116,7 @@ pub async fn download_model(
         pending.insert(key.clone(), cancelled.clone());
     }
     let result = tauri::async_runtime::spawn_blocking(move || {
+        let _task = task;
         let target = root.join(model);
         if installed(&target) {
             return Ok(true);
