@@ -1,5 +1,6 @@
 #![windows_subsystem = "windows"]
 
+mod batch_export;
 mod feishu;
 mod models;
 mod recording;
@@ -432,6 +433,7 @@ fn main() {
             store::complete_onboarding,
             pick_files,
             export_file,
+            batch_export::export_zip,
             transcribe,
             gpu_status,
             open_cuda_download,

@@ -215,7 +215,7 @@ header[data-tauri-drag-region]>div:first-child,header[data-tauri-drag-region]>di
   cursor:pointer;
 }
 .feishu-export-trigger:hover { border-color:currentColor; }
-.feishu-dialog {
+.feishu-dialog, .batch-export-dialog {
   margin:auto;
   width:min(456px, calc(100vw - 32px));
   max-height:calc(100vh - 32px);
@@ -228,8 +228,8 @@ header[data-tauri-drag-region]>div:first-child,header[data-tauri-drag-region]>di
   box-shadow:0 12px 36px #0003;
   font-size:13px;
 }
-.feishu-dialog::backdrop { background:#18181b59; }
-.dark .feishu-dialog { background:#18181b; color:#fafafa; border-color:#3f3f46; }
+.feishu-dialog::backdrop, .batch-export-dialog::backdrop { background:#18181b59; }
+.dark .feishu-dialog, .dark .batch-export-dialog { background:#18181b; color:#fafafa; border-color:#3f3f46; }
 .feishu-dialog header { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px; }
 .feishu-dialog h2 { font-size:15px; font-weight:600; }
 .feishu-dialog form { display:grid; gap:10px; }
@@ -251,6 +251,31 @@ header[data-tauri-drag-region]>div:first-child,header[data-tauri-drag-region]>di
 .feishu-dialog .feishu-primary { background:#18181b; color:#fff; }
 .dark .feishu-dialog .feishu-primary { background:#f4f4f5; color:#18181b; }
 .feishu-feedback { margin-top:10px; line-height:1.5; overflow-wrap:anywhere; }
+
+.batch-export-trigger { padding:3px 6px; border-radius:5px; color:#52525b; }
+.batch-export-trigger:hover { background:#8882; }
+.dark .batch-export-trigger { color:#d4d4d8; }
+.batch-export-dialog form { display:grid; gap:12px; }
+.batch-export-dialog header, .batch-export-selection { display:flex; gap:8px; align-items:center; justify-content:space-between; }
+.batch-export-dialog h2 { font-size:15px; font-weight:600; }
+.batch-export-dialog button { border:1px solid #8885; border-radius:6px; padding:5px 9px; }
+.batch-export-dialog button:hover:not(:disabled) { border-color:currentColor; }
+.batch-export-dialog button:disabled { opacity:.5; cursor:default; }
+.batch-export-selection span { opacity:.76; font-variant-numeric:tabular-nums; }
+.batch-export-search { width:100%; padding:7px 9px; border:1px solid #8885; border-radius:6px; }
+.batch-export-empty { padding:14px 9px; text-align:center; opacity:.76; }
+.batch-export-pagination { display:flex; justify-content:flex-end; align-items:center; gap:8px; }
+.batch-export-pagination span { min-width:58px; text-align:center; font-variant-numeric:tabular-nums; }
+.batch-export-records { max-height:min(34vh, 260px); overflow:auto; border:1px solid #8885; border-radius:8px; }
+.batch-export-records li + li { border-top:1px solid #8883; }
+.batch-export-record, .batch-export-formats label { display:flex; align-items:center; gap:8px; cursor:pointer; }
+.batch-export-record { padding:8px 10px; overflow-wrap:anywhere; }
+.batch-export-record:hover { background:#8881; }
+.batch-export-dialog input { flex:none; accent-color:#5f6067; }
+.batch-export-formats label { display:inline-flex; margin:6px 14px 0 0; }
+.batch-export-dialog footer { display:flex; justify-content:flex-end; }
+.batch-export-dialog .batch-export-save { background:#18181b; color:#fff; }
+.dark .batch-export-dialog .batch-export-save { background:#f4f4f5; color:#18181b; }
 
 .reading-rows { display:grid; gap:2px; }
 .reading-row { padding-block:5px; }
