@@ -295,7 +295,7 @@ async fn choose_directory(app: AppHandle) -> Result<Option<PathBuf>, String> {
 fn set_page(window: tauri::WebviewWindow, page: String) -> Result<(), String> {
     let size = match page.as_str() {
         "loading" => LogicalSize::new(365.0, 132.0),
-        "confirm" => LogicalSize::new(450.0, 252.0),
+        "confirm" => LogicalSize::new(450.0, 264.0),
         "start" | "progress" | "complete" => LogicalSize::new(950.0, 535.0),
         _ => return Err("未知安装页面".into()),
     };

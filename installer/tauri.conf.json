@@ -16,9 +16,8 @@
         "resizable": false,
         "visible": false,
         "decorations": false,
-        "shadow": true,
-        "backgroundColor": "#ffffff00",
-        "transparent": true
+        "shadow": false,
+        "backgroundColor": "#ffffff"
       }
     ],
     "security": {
