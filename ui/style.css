@@ -217,7 +217,7 @@ header[data-tauri-drag-region]>div:first-child,header[data-tauri-drag-region]>di
 .feishu-export-trigger:hover { border-color:currentColor; }
 .feishu-dialog {
   margin:auto;
-  width:min(440px, calc(100vw - 32px));
+  width:min(456px, calc(100vw - 32px));
   max-height:calc(100vh - 32px);
   padding:18px;
   overflow:auto;
@@ -242,7 +242,11 @@ header[data-tauri-drag-region]>div:first-child,header[data-tauri-drag-region]>di
 .feishu-format { display:inline-flex; align-items:center; gap:5px; margin-right:14px; }
 .feishu-format input { accent-color:#5f6067; }
 .feishu-actions { display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:6px; }
+.feishu-footer { display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:8px 12px; }
+.feishu-footer-settings { justify-content:flex-start; margin-inline-end:auto; }
 .feishu-dialog button { padding:5px 8px; border:1px solid #8885; border-radius:6px; cursor:pointer; }
+.feishu-dialog .feishu-danger { color:#b42318; }
+.dark .feishu-dialog .feishu-danger { color:#fda29b; }
 .feishu-dialog button:disabled { opacity:.5; cursor:default; }
 .feishu-dialog .feishu-primary { background:#18181b; color:#fff; }
 .dark .feishu-dialog .feishu-primary { background:#f4f4f5; color:#18181b; }

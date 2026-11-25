@@ -53,6 +53,8 @@ jobs:
           }
           cargo fetch --locked --manifest-path src-tauri/Cargo.toml
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo fetch --locked --manifest-path installer/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Build and sign the Windows installer
         if: steps.release.outputs.exists != 'true'
         env:
@@ -65,7 +67,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $version = $env:GITHUB_REF_NAME.Substring(1)
-          $bundle = 'src-tauri/target/release/bundle/nsis'
+          $bundle = 'src-tauri/target/release/bundle/windows'
           $installer = Join-Path $bundle "MONO.STT_${version}_x64-setup.exe"
           gh release create $env:GITHUB_REF_NAME $installer "$installer.sig" "$bundle/latest.json" --verify-tag --draft --generate-notes --title "MONO.STT $version"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

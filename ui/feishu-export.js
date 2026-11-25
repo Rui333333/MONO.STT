@@ -12,6 +12,7 @@ function createFeishuExport(React, jsx) {
     const [error, setError] = React.useState('');
     const [permissions, setPermissions] = React.useState(null);
     const [notice, setNotice] = React.useState('');
+    const [confirmDelete, setConfirmDelete] = React.useState(false);
     const call = desktop.invoke;
 
     async function readStatus() {
@@ -21,6 +22,7 @@ function createFeishuExport(React, jsx) {
     }
 
     async function open() {
+      setConfirmDelete(false);
       setError('');
       setPermissions(null);
       setNotice('');
@@ -81,6 +83,23 @@ function createFeishuExport(React, jsx) {
       }
     }
 
+    async function removeDocument(event) {
+      event.preventDefault();
+      if (busy || !status.url) return;
+      setError('');
+      setBusy('delete');
+      try {
+        await call('feishu_delete_document', {recordId, expectedUrl:status.url});
+        setStatus(current => ({...current, url:null, needsRecovery:false}));
+        setConfirmDelete(false);
+        setNotice('飞书云文档已删除。');
+      } catch (failure) {
+        setError(String(failure));
+      } finally {
+        setBusy('');
+      }
+    }
+
     function field(label, value, onChange, props = {}) {
       return jsx('label', {className:'feishu-field', children:[
         jsx('span', {children:label}),
@@ -124,16 +143,27 @@ function createFeishuExport(React, jsx) {
         ref:dialog, className:'feishu-dialog', 'aria-labelledby':'feishu-export-heading',
         onCancel:event => {
           event.stopPropagation();
-          if (busy) event.preventDefault();
+          if (busy || confirmDelete) {
+            event.preventDefault();
+            if (!busy) { setConfirmDelete(false); setError(''); }
+          }
           else setAppSecret('');
         },
         onClose:() => setAppSecret(''),
         children:[
           jsx('header', {children:[
-            jsx('h2', {id:'feishu-export-heading', children:'发布到飞书云文档'}),
+            jsx('h2', {id:'feishu-export-heading', children:confirmDelete ? '删除飞书云文档？' : '发布到飞书云文档'}),
             action('关闭', {onClick:() => dialog.current.close(), disabled:!!busy}),
           ]}),
-          status && (settingsOpen ?
+          status && (confirmDelete ?
+            jsx('form', {onSubmit:removeDocument, children:[
+              jsx('p', {className:'feishu-title', children:title || '转录结果'}),
+              jsx('p', {className:'feishu-hint', children:'关联的飞书云文档将移到回收站，本地转录仍可查看和重新发布。'}),
+              jsx('div', {className:'feishu-actions', children:[
+                action('取消', {autoFocus:true, onClick:() => {setConfirmDelete(false); setError('');}, disabled:!!busy}),
+                action(busy === 'delete' ? '删除中…' : '确认删除', {type:'submit', className:'feishu-danger', disabled:!!busy}),
+              ]}),
+            ]}) : settingsOpen ?
             jsx('form', {onSubmit:save, children:[
               jsx('p', {className:'feishu-hint', children:'使用已启用「创建及编辑新版文档」（docx:document）权限的飞书自建应用。'}),
               action('获取凭据 ↗', {
@@ -170,7 +200,12 @@ function createFeishuExport(React, jsx) {
                 ),
               ]}),
               status.url && jsx('p', {className:'feishu-hint', children:'再次写入会替换同一篇飞书文档的正文。'}),
-              status.url && linkActions(status.url,'打开文档 ↗','feishu_open_document',{recordId}),
+              status.url && jsx('div', {className:'feishu-link-actions', children:
+                jsx('a', {href:status.url, title:status.url, onClick:event => {
+                  event.preventDefault();
+                  if (!busy) openLink('feishu_open_document', {recordId});
+                }, children:status.url}),
+              }),
               permissions && jsx('section',{className:'feishu-permission',role:'status',children:[
                 jsx('strong',{children:'需要开通飞书文档权限'}),
                 jsx('p',{className:'feishu-hint',children:'在权限管理中开通「创建及编辑新版文档」（docx:document），发布新版本。权限生效后，返回这里重试。'}),
@@ -180,18 +215,27 @@ function createFeishuExport(React, jsx) {
                 jsx('p', {className:'feishu-hint', children:'上次创建结果未确认。请核对飞书中的文档，将链接填在下方以继续写入。'}),
                 field('已创建的飞书文档链接', recoveryLink, setRecoveryLink, {required:true}),
               ]}),
-              jsx('div', {className:'feishu-actions', children:[
-                action('凭据设置', {onClick:() => {
-                  setAppId(status.appId);
-                  setFolder(status.folder);
-                  setError('');
-                  setPermissions(null);
-                  setNotice('');
-                  showSettings(true);
-                }, disabled:!!busy}),
-                action(busy === 'publish' ? '写入中…' : permissions ? '授权后重试' : status.url ? '更新文档' : '创建并写入', {
-                  type:'submit', className:'feishu-primary', disabled:!!busy,
-                }),
+              jsx('div', {className:'feishu-footer', children:[
+                jsx('div', {className:'feishu-actions feishu-footer-settings', children:[
+                  action('凭据设置', {onClick:() => {
+                    setAppId(status.appId);
+                    setFolder(status.folder);
+                    setError('');
+                    setPermissions(null);
+                    setNotice('');
+                    showSettings(true);
+                  }, disabled:!!busy}),
+                  status.url && action('删除云文档', {className:'feishu-danger', onClick:() => {
+                    setError(''); setNotice(''); setPermissions(null); setConfirmDelete(true);
+                  }, disabled:!!busy}),
+                ]}),
+                jsx('div', {className:'feishu-actions', children:[
+                  status.url && action('打开文档 ↗', {onClick:() => openLink('feishu_open_document', {recordId}), disabled:!!busy}),
+                  status.url && action('复制链接', {onClick:() => copyLink(status.url), disabled:!!busy}),
+                  action(busy === 'publish' ? '写入中…' : permissions ? '授权后重试' : status.url ? '更新文档' : '创建并写入', {
+                    type:'submit', className:'feishu-primary', disabled:!!busy,
+                  }),
+                ]}),
               ]}),
             ]})),
           busy === 'loading' && jsx('p', {role:'status', children:'正在读取飞书设置…'}),

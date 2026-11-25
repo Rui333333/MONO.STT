@@ -2,11 +2,13 @@
 
 MONO.STT 在启动后检查更新，也可以在「偏好设置 → 通用 → 检查更新」手动检查。新版确认后，应用会下载并验证签名，由 Windows 安装程序完成升级。
 
+Windows 安装包把原生启动器、WebView2 引导组件、Tauri 界面和应用资源封在一个 EXE 中。手动安装可选择目录，覆盖安装沿用注册表里记录的目录。`setup.exe /s` 使用静默模式，可用退出码判断结果。
+
 ## 本机生成发布包
 
 运行 `pwsh -File .\build-windows.ps1 -Slim -Signed`。脚本使用 `TAURI_SIGNING_PRIVATE_KEY` 和 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。若未配置环境变量，Windows 下会读取 `%LOCALAPPDATA%\MONO.STT\Signing\updater.key` 和同目录下由当前 Windows 用户加密的 `updater-password.dpapi`。
 
-从 `src-tauri/target/release/bundle/nsis` 取出本次构建的 `*-setup.exe`、对应的 `.sig` 和 `latest.json`，一起上传至和版本号一致的 GitHub Release。例如版本 `0.1.4` 对应标签 `v0.1.4`。可以在发布前把 `latest.json` 的 `notes` 改成这一版的更新说明。
+从 `src-tauri/target/release/bundle/windows` 取出本次构建的 `*-setup.exe`、对应的 `.sig` 和 `latest.json`，一起上传至和版本号一致的 GitHub Release。例如版本 `0.1.4` 对应标签 `v0.1.4`。可以在发布前把 `latest.json` 的 `notes` 改成这一版的更新说明。
 
 ## 使用 GitHub Actions
 

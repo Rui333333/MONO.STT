@@ -5,10 +5,8 @@ Set-Location -LiteralPath $PSScriptRoot
 $target = Join-Path $PSScriptRoot 'src-tauri/target'
 $staging = Join-Path $target 'windows-bundle'
 $runtime = Join-Path $staging 'runtime'
-$packageConfig = Join-Path $staging 'bundle.json'
 if ($Slim) {
     $runtime = Join-Path $staging 'runtime-slim'
-    $packageConfig = Join-Path $staging 'bundle-slim.json'
 }
 $pythonArchive = Join-Path $staging 'python-3.12.10-embed-amd64.zip'
 $expectedHash = '4ACBED6DD1C744B0376E3B1CF57CE906F9DC9E95E68824584C8099A63025A3C3'
@@ -58,34 +56,18 @@ if (-not $BundleOnly) {
         Move-Item -LiteralPath $buildRuntime -Destination $runtime
     }
 
-    $source = (Resolve-Path -LiteralPath $runtime).Path.Replace('\', '/')
-    @{
-        bundle = @{
-            active = $true
-            targets = @('nsis')
-            resources = @{ $source = 'runtime/' }
-            windows = @{
-                webviewInstallMode = @{ type = 'embedBootstrapper' }
-                nsis = @{
-                    installMode = 'currentUser'
-                    languages = @('SimpChinese', 'English')
-                    compression = $(if ($Slim) { 'lzma' } else { 'zlib' })
-                }
-            }
-        }
-    } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $packageConfig -Encoding utf8
 }
 if ($PrepareOnly) { return }
+if (!(Test-Path -LiteralPath (Join-Path $runtime 'python.exe'))) { throw '请先准备 Windows 推理运行库。' }
 
-$env:npm_config_registry = 'https://registry.npmjs.org'
-$tauriArgs = @('tauri', 'build', '--config', $packageConfig, '--bundles', 'nsis')
+$config = Get-Content -LiteralPath 'src-tauri/tauri.conf.json' -Raw | ConvertFrom-Json
 $previousSigned = $env:MONO_SIGNED_UPDATE_BUILD
 $previousKey = $env:TAURI_SIGNING_PRIVATE_KEY
+$previousKeyPath = $env:TAURI_SIGNING_PRIVATE_KEY_PATH
 $previousPassword = $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD
-$config = Get-Content -LiteralPath 'src-tauri/tauri.conf.json' -Raw | ConvertFrom-Json
 try {
     if ($Signed) {
-        if (!$env:TAURI_SIGNING_PRIVATE_KEY) {
+        if (!$env:TAURI_SIGNING_PRIVATE_KEY -and !$env:TAURI_SIGNING_PRIVATE_KEY_PATH) {
             $keyDir = Join-Path $env:LOCALAPPDATA 'MONO.STT/Signing'
             $key = Join-Path $keyDir 'updater.key'
             $password = Join-Path $keyDir 'updater-password.dpapi'
@@ -95,44 +77,71 @@ try {
             if ((Get-Content -LiteralPath "$key.pub" -Raw).Trim() -ne $config.plugins.updater.pubkey) {
                 throw '本机签名密钥与应用内公钥不匹配。'
             }
-            $env:TAURI_SIGNING_PRIVATE_KEY = $key
+            $env:TAURI_SIGNING_PRIVATE_KEY_PATH = $key
             $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ConvertFrom-SecureString -AsPlainText (
                 (Get-Content -LiteralPath $password -Raw).Trim() | ConvertTo-SecureString
             )
         }
         $env:MONO_SIGNED_UPDATE_BUILD = '1'
-        $signingConfig = Join-Path $staging 'bundle-signed.json'
-        '{"bundle":{"createUpdaterArtifacts":true}}' |
-            Set-Content -LiteralPath $signingConfig -Encoding utf8NoBOM
-        $tauriArgs += @('--config', $signingConfig)
     } else {
         $env:MONO_SIGNED_UPDATE_BUILD = $null
     }
-    npm exec --yes --package=@tauri-apps/cli@2.12.6 -- @tauriArgs -- --offline --locked
-    if ($LASTEXITCODE -ne 0) { throw 'Windows 安装程序构建失败。' }
+
+    if (!$BundleOnly) {
+        cargo build --release --locked --manifest-path src-tauri/Cargo.toml
+        if ($LASTEXITCODE -ne 0) { throw '应用构建失败。' }
+    }
+    cargo build --release --locked --manifest-path installer/Cargo.toml --target-dir $target
+    if ($LASTEXITCODE -ne 0) { throw '安装引导器构建失败。' }
+
+    $webview = Join-Path $staging 'MicrosoftEdgeWebView2Setup.exe'
+    if (!(Test-Path -LiteralPath $webview)) {
+        $cache = Join-Path $env:LOCALAPPDATA 'tauri/MicrosoftEdgeWebview2Setup.exe'
+        if (Test-Path -LiteralPath $cache) {
+            Copy-Item -LiteralPath $cache -Destination $webview
+        } else {
+            New-Item -ItemType Directory -Path $staging -Force | Out-Null
+            Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile "$webview.part"
+            Move-Item -LiteralPath "$webview.part" -Destination $webview
+        }
+    }
+    $authenticode = Get-AuthenticodeSignature -LiteralPath $webview
+    if ($authenticode.Status -ne 'Valid' -or $authenticode.SignerCertificate.Subject -notmatch 'Microsoft Corporation') {
+        throw 'WebView2 安装程序缺少有效的 Microsoft 签名。'
+    }
+
+    $version = $config.version
+    $bundle = Join-Path $target 'release/bundle/windows'
+    New-Item -ItemType Directory -Path $bundle -Force | Out-Null
+    $name = "$($config.productName)_${version}_x64-setup.exe"
+    $result = Join-Path $bundle $name
+    $build = Join-Path $target 'release'
+    python installer/pack.py $build $runtime $webview $version $result
+    if ($LASTEXITCODE -ne 0) { throw '无法封装 Windows 安装包。' }
+
+    if ($Signed) {
+        $env:npm_config_registry = 'https://registry.npmjs.org'
+        npm exec --yes --package=@tauri-apps/cli@2.12.6 -- tauri signer sign --app-version $version $result
+        if ($LASTEXITCODE -ne 0) { throw '安装包签名失败。' }
+        $signature = (Get-Content -LiteralPath "$result.sig" -Raw).Trim()
+        if (!$signature) { throw '签名为空。' }
+        $release = 'https://github.com/Rui333333/MONO.STT/releases/download'
+        @{
+            version = $version
+            notes = "MONO.STT $version"
+            pub_date = [DateTimeOffset]::UtcNow.ToString('o')
+            platforms = @{
+                'windows-x86_64' = @{
+                    url = "$release/v$version/$([Uri]::EscapeDataString($name))"
+                    signature = $signature
+                }
+            }
+        } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $bundle 'latest.json') -Encoding utf8NoBOM
+    }
+    Get-Item -LiteralPath $result | Select-Object FullName, Length
 } finally {
     $env:MONO_SIGNED_UPDATE_BUILD = $previousSigned
     $env:TAURI_SIGNING_PRIVATE_KEY = $previousKey
+    $env:TAURI_SIGNING_PRIVATE_KEY_PATH = $previousKeyPath
     $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = $previousPassword
-}
-
-if ($Signed) {
-    $version = $config.version
-    $nsis = Join-Path $target 'release/bundle/nsis'
-    $name = "$($config.productName)_${version}_x64-setup.exe"
-    $installer = Join-Path $nsis $name
-    $signature = (Get-Content -LiteralPath "$installer.sig" -Raw).Trim()
-    if (!(Test-Path -LiteralPath $installer) -or !$signature) { throw '找不到已签名的安装程序。' }
-    $release = 'https://github.com/Rui333333/MONO.STT/releases/download'
-    @{
-        version = $version
-        notes = "MONO.STT $version"
-        pub_date = [DateTimeOffset]::UtcNow.ToString('o')
-        platforms = @{
-            'windows-x86_64' = @{
-                url = "$release/v$version/$([Uri]::EscapeDataString($name))"
-                signature = $signature
-            }
-        }
-    } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $nsis 'latest.json') -Encoding utf8NoBOM
 }

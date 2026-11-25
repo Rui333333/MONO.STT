@@ -85,6 +85,7 @@ fn store_credentials(value: &Value) -> Result<(), String> {
 
 struct ApiError {
     message: String,
+    code: Option<i64>,
     rejected: bool,
     missing_permissions: bool,
 }
@@ -93,6 +94,7 @@ impl ApiError {
     fn unknown(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
+            code: None,
             rejected: false,
             missing_permissions: false,
         }
@@ -154,6 +156,7 @@ fn api(
         .spawn()
         .map_err(|error| ApiError {
             message: format!("无法启动飞书连接：{error}"),
+            code: None,
             rejected: true,
             missing_permissions: false,
         })?;
@@ -174,6 +177,7 @@ fn api(
         let code = output.status.code().unwrap_or_default();
         return Err(ApiError {
             message: format!("连接飞书失败（curl {code}）"),
+            code: None,
             rejected: matches!(code, 5 | 6 | 7 | 35 | 60),
             missing_permissions: false,
         });
@@ -185,6 +189,7 @@ fn api(
     let status = status.trim().parse::<u16>().unwrap_or_default();
     let parsed: Value = serde_json::from_str(response).map_err(|_| ApiError {
         message: format!("飞书响应格式异常（HTTP {status}）"),
+        code: None,
         rejected: (400..500).contains(&status),
         missing_permissions: false,
     })?;
@@ -203,6 +208,7 @@ fn api(
             "飞书请求失败（{}）：{detail}",
             code.map_or_else(|| status.to_string(), |value| value.to_string())
         ),
+        code,
         missing_permissions: code == Some(99991672),
         rejected: code == Some(99991672)
             || (400..500).contains(&status)
@@ -378,6 +384,56 @@ pub fn feishu_open_document(app: tauri::AppHandle, record_id: String) -> Result<
     open_feishu_url(&url)
 }
 
+#[tauri::command]
+pub async fn feishu_delete_document(
+    app: tauri::AppHandle,
+    record_id: String,
+    expected_url: String,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<FeishuPublish>();
+        let _guard = state.0.try_lock().map_err(|error| match error {
+            TryLockError::WouldBlock => "另一个飞书文档操作正在进行，请稍后重试",
+            TryLockError::Poisoned(_) => "飞书文档操作状态异常，请重启应用",
+        })?;
+        let storage = Binding::new(&app, &record_id)?;
+        let binding = storage.read()?;
+        if binding_url(&binding).as_deref() != Some(expected_url.as_str()) {
+            return Err("飞书文档关联已变更，请重新打开发布窗口确认".into());
+        }
+        let config = credentials()?.ok_or("请先配置飞书应用凭据")?;
+        if text(&binding, "appId") != text(&config, "appId") {
+            return Err("请切换回此文档关联的飞书应用凭据后再删除".into());
+        }
+        delete_document(text(&binding, "documentId"), &token(&config)?, api)?;
+        // Persist a null value so a legacy binding file cannot restore the deleted link.
+        storage
+            .write(&Value::Null)
+            .map_err(|error| format!("云文档已删除，但本地关联清理失败，请重试：{error}"))
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+fn delete_document(
+    document: &str,
+    token: &str,
+    request: impl Fn(&str, &str, Option<&str>, Option<&Value>) -> Result<Value, ApiError>,
+) -> Result<(), String> {
+    let path = format!("/drive/v1/files/{document}?type=docx&async=false");
+    match request("DELETE", &path, Some(token), None) {
+        Ok(_) => Ok(()),
+        Err(error) if error.code == Some(1061007) => Ok(()), // Already deleted in Feishu.
+        Err(error) if error.missing_permissions => {
+            Err("请在飞书开发者后台开通「删除云空间文件夹和云文档」（space:document:delete），发布应用版本后重试。".into())
+        }
+        Err(error) if error.code == Some(1061004) => {
+            Err("飞书应用没有删除此文档的权限，请核对文档和所在文件夹的授权。".into())
+        }
+        Err(error) => Err(error.message),
+    }
+}
+
 fn permissions_url(app_id: &str) -> Option<String> {
     (app_id.starts_with("cli_") && valid_id(app_id)).then(||
         format!("https://open.feishu.cn/app/{app_id}/auth?q=docx%3Adocument&op_from=openapi&token_type=tenant"))
@@ -458,8 +514,8 @@ pub async fn feishu_publish(
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<FeishuPublish>();
         let _guard = state.0.try_lock().map_err(|error| match error {
-            TryLockError::WouldBlock => "另一个飞书发布正在进行，请稍后重试",
-            TryLockError::Poisoned(_) => "飞书发布状态异常，请重启应用",
+            TryLockError::WouldBlock => "另一个飞书文档操作正在进行，请稍后重试",
+            TryLockError::Poisoned(_) => "飞书文档操作状态异常，请重启应用",
         })?;
         publish(
             &Binding::new(&app, &record_id)?,
@@ -665,6 +721,35 @@ fn write_transcript(
 mod tests {
     use super::*;
     use std::cell::{Cell, RefCell};
+
+    #[test]
+    fn deletion_allows_retry_after_remote_success_and_reports_permission_errors() {
+        let code = Cell::new(None);
+        let request = |method: &str, path: &str, token: Option<&str>, body: Option<&Value>| {
+            assert_eq!(method, "DELETE");
+            assert_eq!(path, "/drive/v1/files/doc1?type=docx&async=false");
+            assert_eq!(token, Some("test-token"));
+            assert!(body.is_none());
+            match code.get() {
+                None => Ok(json!({"code":0})),
+                Some(code) => Err(ApiError {
+                    message: "request rejected".into(),
+                    code: Some(code),
+                    rejected: true,
+                    missing_permissions: code == 99991672,
+                }),
+            }
+        };
+        assert!(delete_document("doc1", "test-token", request).is_ok());
+        code.set(Some(1061007));
+        assert!(delete_document("doc1", "test-token", request).is_ok());
+        code.set(Some(99991672));
+        assert!(delete_document("doc1", "test-token", request)
+            .unwrap_err()
+            .contains("space:document:delete"));
+        code.set(Some(1061004));
+        assert!(delete_document("doc1", "test-token", request).is_err());
+    }
 
     #[test]
     fn writes_one_plain_paragraph_per_srt_cue() {

@@ -439,6 +439,7 @@ fn main() {
             feishu::feishu_status,
             feishu::feishu_save_credentials,
             feishu::feishu_publish,
+            feishu::feishu_delete_document,
             feishu::feishu_open_document,
             feishu::feishu_open_permissions,
             store_recording,

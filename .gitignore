@@ -6,3 +6,5 @@ __pycache__/
 
 /data/
 /.build.log
+/installer/target/
+/installer/gen/schemas/
