@@ -3,7 +3,7 @@ use serde_json::{json, Value};
 use std::{
     ffi::OsStr,
     os::windows::ffi::OsStrExt,
-    ptr::{null, null_mut},
+    ptr::null_mut,
 };
 use std::{
     fs,
