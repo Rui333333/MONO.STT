@@ -1,5 +1,8 @@
+const monoMacOS = /Macintosh/.test(navigator.userAgent);
+document.documentElement.classList.toggle('mono-macos', monoMacOS);
+
 function monoWindowControls(React, jsx) {
-  if (/Macintosh/.test(navigator.userAgent)) return null;
+  if (monoMacOS) return null;
   const win = window.__TAURI__.window.getCurrentWindow();
   const [maximized, setMaximized] = React.useState(false);
   React.useEffect(() => {
