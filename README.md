@@ -1,24 +1,42 @@
 # MONO.STT
 
-MONO.STT 是一款 Windows 桌面转录工具。导入本地音频、视频，或直接使用麦克风录音，应用会在本机生成带时间戳的逐字稿。逐字稿支持回听、校对和导出，适合整理访谈、课程和会议记录。
+MONO.STT 是一款 Windows 和 macOS 桌面转录工具。导入音频、视频或使用麦克风录音，即可在本机生成带时间戳的逐字稿。转录结果可以回听、校对和导出，适合整理访谈、课程和会议记录。
+
+## 下载与安装
+
+| 平台 | 计算设备 | 0.1.5 安装包 |
+| --- | --- | --- |
+| Windows x64 | CPU、兼容的 NVIDIA CUDA | [下载 EXE](https://github.com/Rui333333/MONO.STT/releases/download/v0.1.5/MONO.STT_0.1.5_x64-setup.exe) |
+| macOS 14 及以上，Apple Silicon（M 系列） | CPU | [下载 DMG](https://github.com/Rui333333/MONO.STT/releases/download/v0.1.5/MONO.STT_0.1.5_arm64.dmg) |
+
+- **Windows** 双击 EXE 并按提示安装。可以在「偏好设置 → 通用 → 检查更新」手动检查新版。
+- **macOS** 打开 DMG，将 MONO.STT 拖入「应用程序」。当前安装包尚未完成 Apple 公证，首次打开可能会出现系统提示。macOS 在线更新暂未启用。 [Apple 官方说明](https://support.apple.com/zh-cn/102445)
+
+两个安装包都内置转录引擎。首次启动时按引导下载模型或选择已有模型目录，然后用内置普通话音频试转录。其他版本见 [GitHub Releases](https://github.com/Rui333333/MONO.STT/releases)。
 
 ## 功能
 
-- **本地转录** — 支持 Whisper large-v3-turbo 和 Whisper large-v3，可使用 CPU 或兼容的 NVIDIA CUDA 环境。
-- **首次设置** — 检测设备、下载或导入已有模型，并用内置普通话音频试转录。
-- **时间轴校对** — 点击时间戳跳转回听，支持播放速度、当前段落跟随和回到当前朗读行。
-- **导出** — 单条记录可导出 TXT、Markdown 和 SRT。多条记录可将 TXT 或 SRT 打包为 ZIP，也可按需发布到飞书云文档。
-- **本地归档** — 转录、设置和关联信息保存在软件目录下的 `data/mono.db`。回听音轨和录音保存在 `data/audio/` 和 `data/recordings/`。
-
-## 安装与使用
-
-1. 从 [GitHub Releases](https://github.com/Rui333333/MONO.STT/releases) 获取 Windows x64 安装包并安装。
-2. 首次打开时选择计算设备和语音模型。可以下载模型，也可以选择已有的模型目录。示例试转录通过后即可进入工作台。
-3. 把音视频拖入窗口，确认后开始转录。完成后可在时间轴校对文字并导出。
+- **本地转录** 支持 Whisper Large v3 Turbo 和 Whisper Large v3。可拖入音视频，也可在应用里录音。
+- **时间轴校对** 点击时间戳跳转回听，可调整播放速度、开启滚动跟随并修改逐字稿。
+- **文件导出** 单条记录可导出 TXT、Markdown 和 SRT。批量导出支持搜索、分页和跨页勾选，可将 TXT、SRT 或两种格式打包进一个 ZIP。
+- **飞书云文档** 配置自建应用凭据后，可把转录内容写入飞书，更新或删除已关联的文档。
 
 语音识别和回听在本机运行。下载模型、检查更新或主动发布到飞书时需要网络。删除转录记录会清理应用保存的配套音频，导入原件保留在原位置。
 
+## 数据位置
+
+| 平台 | 转录、录音和设置 | 默认模型目录 |
+| --- | --- | --- |
+| Windows | 安装目录下的 `data/` | 安装目录下的 `models/` |
+| macOS | `~/Library/Application Support/MONO.STT/data/` | `~/Library/Application Support/MONO.STT/models/` |
+
+两个平台都可以在偏好设置中修改模型目录。转录记录保存在 `data/mono.db`，回听音轨和录音分别保存在 `data/audio/` 和 `data/recordings/`。
+
 ## 从源码构建
+
+### Windows
+
+Windows 代码位于 [`codex/windows-0.1.5`](https://github.com/Rui333333/MONO.STT/tree/codex/windows-0.1.5)。
 
 在 Windows x64 上准备 PowerShell 7、Python、Rust MSVC 工具链、Visual Studio C++ 生成工具和 Windows SDK。从仓库根目录运行：
 
@@ -28,14 +46,20 @@ pwsh -File .\build-windows.ps1 -Slim
 
 安装包输出到 `src-tauri/target/release/bundle/windows/`。精简包包含本地推理运行环境。使用 GPU 加速时需要可用的 NVIDIA CUDA 运行库。
 
+Windows 发布、代码签名和自动更新配置见 [UPDATES.md](UPDATES.md)。
+
+### macOS
+
+macOS 代码位于 [`codex/macos-0.1.5`](https://github.com/Rui333333/MONO.STT/tree/codex/macos-0.1.5)。该分支的构建流程会打包 arm64 转录引擎和应用，生成 DMG，再挂载安装包运行 CPU 示例转录。GitHub Actions 的构建产物名为 `MONO.STT-macOS-arm64`。 [macOS 构建流程](https://github.com/Rui333333/MONO.STT/blob/codex/macos-0.1.5/.github/workflows/macos-preview.yml)
+
+## 项目结构
+
 | 路径 | 内容 |
 | --- | --- |
 | `ui/` | 桌面界面、首次设置和转录校对 |
 | `src-tauri/` | Tauri 桌面应用、SQLite 存储和系统集成 |
 | `backend/` | Python 转录引擎 |
 | `installer/` | Windows 安装器和打包工具 |
-
-发布、Windows 代码签名和自动更新配置见 [UPDATES.md](UPDATES.md)。
 
 ## 许可证
 
