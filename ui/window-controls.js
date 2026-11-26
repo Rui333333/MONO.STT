@@ -1,4 +1,5 @@
 function monoWindowControls(React, jsx) {
+  if (/Macintosh/.test(navigator.userAgent)) return null;
   const win = window.__TAURI__.window.getCurrentWindow();
   const [maximized, setMaximized] = React.useState(false);
   React.useEffect(() => {

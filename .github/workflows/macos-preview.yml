@@ -1,0 +1,76 @@
+name: macOS Apple Silicon preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/macos-preview]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 35
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '14.0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: arm64
+      - name: Prepare the embedded transcriber
+        run: |
+          test "$(uname -m)" = arm64
+          python -m pip install --only-binary=:all: 'pyinstaller>=6.11,<7' 'faster-whisper==1.2.1' 'ctranslate2==4.9.1' 'av==16.1.0'
+          python -m PyInstaller --noconfirm --clean --onedir --target-architecture arm64 \
+            --name mono-stt-worker --distpath "$RUNNER_TEMP/worker" --workpath "$RUNNER_TEMP/pyinstaller" \
+            --specpath "$RUNNER_TEMP" --collect-all av --collect-all ctranslate2 \
+            --collect-all onnxruntime --collect-data faster_whisper --copy-metadata faster-whisper \
+            backend/transcribe.py
+          "$RUNNER_TEMP/worker/mono-stt-worker/mono-stt-worker" --probe-runtime
+      - name: Build the desktop application
+        run: |
+          cargo test --locked --manifest-path src-tauri/Cargo.toml
+          npm exec --yes --package=@tauri-apps/cli@2.12.6 -- tauri build --bundles app -- --locked
+      - name: Create the DMG
+        run: |
+          app="src-tauri/target/release/bundle/macos/MONO.STT.app"
+          ditto "$RUNNER_TEMP/worker/mono-stt-worker" "$app/Contents/Resources/runtime"
+          codesign --force --sign - "$app"
+          codesign --verify --deep --strict "$app"
+          version=$(python -c 'import json; print(json.load(open("src-tauri/tauri.conf.json"))["version"])')
+          stage="$RUNNER_TEMP/dmg-stage"
+          mkdir -p "$stage" dist-macos
+          ditto "$app" "$stage/MONO.STT.app"
+          ln -s /Applications "$stage/Applications"
+          hdiutil create -ov -volname 'MONO.STT' -srcfolder "$stage" -format UDZO "dist-macos/MONO.STT_${version}_arm64.dmg"
+      - name: Verify the packaged app and CPU transcription
+        run: |
+          mount="$RUNNER_TEMP/mono-mount"
+          mkdir -p "$mount"
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount" dist-macos/*.dmg
+          trap 'hdiutil detach "$mount"' EXIT
+          app="$mount/MONO.STT.app"
+          codesign --verify --deep --strict "$app"
+          lipo -archs "$app/Contents/MacOS/mono-stt" | grep -x arm64
+          plutil -extract NSMicrophoneUsageDescription raw "$app/Contents/Info.plist"
+          worker="$app/Contents/Resources/runtime/mono-stt-worker"
+          "$worker" --probe-runtime
+          model="$RUNNER_TEMP/whisper-tiny"
+          python -c 'from huggingface_hub import snapshot_download; import sys; snapshot_download("Systran/faster-whisper-tiny", local_dir=sys.argv[1], allow_patterns=["*.json", "model.bin"])' "$model"
+          "$worker" ui/sample_zh.wav "$model" "$RUNNER_TEMP/test.wav" '{"computeDevice":"cpu","language":"zh"}' > "$RUNNER_TEMP/transcription.jsonl"
+          python -c 'import json, sys; results=[json.loads(line) for line in open(sys.argv[1])]; assert any(r.get("kind")=="result" and r.get("device")=="cpu" and r.get("segments") for r in results), results' "$RUNNER_TEMP/transcription.jsonl"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MONO.STT-macOS-arm64
+          path: dist-macos/*.dmg
+          if-no-files-found: error

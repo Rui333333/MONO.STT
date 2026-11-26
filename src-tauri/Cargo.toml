@@ -25,3 +25,6 @@ default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_UI_WindowsAndMessaging", "Win32_UI_HiDpi", "Win32_System_LibraryLoader", "Win32_Security_Credentials", "Win32_Storage_FileSystem", "Win32_UI_Shell"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "3.7"

@@ -1,0 +1,21 @@
+{
+  "app": {
+    "windows": [{
+      "label": "main",
+      "title": "MONO.STT",
+      "center": true,
+      "width": 1000,
+      "height": 680,
+      "minWidth": 800,
+      "minHeight": 540,
+      "decorations": true,
+      "visible": false,
+      "backgroundColor": "#f4f4f5"
+    }]
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app"],
+    "macOS": {"minimumSystemVersion": "14.0", "signingIdentity": "-"}
+  }
+}

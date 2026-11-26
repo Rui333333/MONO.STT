@@ -1,14 +1,14 @@
-#![windows_subsystem = "windows"]
+#![cfg_attr(windows, windows_subsystem = "windows")]
 
 mod batch_export;
 mod feishu;
 mod models;
+mod platform;
 mod recording;
 mod store;
 mod updates;
 
 use serde_json::{json, Value};
-use std::os::windows::process::CommandExt;
 use std::{
     fs,
     io::{BufRead, BufReader},
@@ -18,55 +18,25 @@ use std::{
 use tauri::{path::BaseDirectory, Emitter, Manager};
 use tauri_plugin_dialog::DialogExt;
 
+#[cfg(windows)]
 const INFERENCE_WORKER: &str = include_str!("../../backend/transcribe.py");
 
 #[tauri::command]
 fn open_feishu_credentials() -> Result<(), String> {
-    use windows_sys::Win32::UI::{Shell::ShellExecuteW, WindowsAndMessaging::SW_SHOWNORMAL};
-    let url: Vec<u16> = "https://open.feishu.cn/app"
-        .encode_utf16()
-        .chain(Some(0))
-        .collect();
-    let result = unsafe {
-        ShellExecuteW(
-            std::ptr::null_mut(),
-            std::ptr::null(),
-            url.as_ptr(),
-            std::ptr::null(),
-            std::ptr::null(),
-            SW_SHOWNORMAL,
-        )
-    };
-    if (result as isize) <= 32 {
-        return Err("无法打开飞书开发者后台".into());
-    }
-    Ok(())
+    platform::open_url("https://open.feishu.cn/app")
 }
 
 #[tauri::command]
 fn open_cuda_download() -> Result<(), String> {
-    use windows_sys::Win32::UI::{Shell::ShellExecuteW, WindowsAndMessaging::SW_SHOWNORMAL};
-    let url: Vec<u16> =
-        "https://developer.nvidia.com/cuda-12-9-0-download-archive?target_os=Windows"
-            .encode_utf16()
-            .chain(Some(0))
-            .collect();
-    let result = unsafe {
-        ShellExecuteW(
-            std::ptr::null_mut(),
-            std::ptr::null(),
-            url.as_ptr(),
-            std::ptr::null(),
-            std::ptr::null(),
-            SW_SHOWNORMAL,
-        )
-    };
-    if (result as isize) <= 32 {
-        return Err("无法打开 NVIDIA 下载页".into());
-    }
-    Ok(())
+    #[cfg(windows)]
+    return platform::open_url(
+        "https://developer.nvidia.com/cuda-12-9-0-download-archive?target_os=Windows",
+    );
+    #[cfg(target_os = "macos")]
+    return Err("macOS 预览版使用 CPU 转录".into());
 }
 
+#[cfg(windows)]
 fn inference_python(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     if let Ok(runtime) = app
         .path()
@@ -89,18 +59,18 @@ async fn gpu_status(app: tauri::AppHandle) -> Result<Value, String> {
         .map_err(|error| error.to_string())
 }
 
+#[cfg(windows)]
 fn probe_gpu(app: tauri::AppHandle) -> Value {
     let system = std::env::var_os("SystemRoot")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(r"C:\Windows"))
         .join("System32");
     let mut adapters = Vec::new();
-    if let Ok(output) = Command::new(system.join("nvidia-smi.exe"))
+    if let Ok(output) = platform::command(system.join("nvidia-smi.exe"))
         .args([
             "--query-gpu=name,memory.total,compute_cap",
             "--format=csv,noheader,nounits",
         ])
-        .creation_flags(0x08000000)
         .output()
     {
         if output.status.success() {
@@ -116,15 +86,14 @@ fn probe_gpu(app: tauri::AppHandle) -> Value {
         }
     }
     if adapters.is_empty() {
-        if let Ok(output) = Command::new(system.join(r"WindowsPowerShell\v1.0\powershell.exe"))
+        if let Ok(output) = platform::command(system.join(r"WindowsPowerShell\v1.0\powershell.exe"))
             .args([
                 "-NoProfile",
                 "-NonInteractive",
                 "-Command",
                 "[Console]::OutputEncoding = [Text.Encoding]::UTF8; (Get-CimInstance Win32_VideoController).Name",
             ])
-            .creation_flags(0x08000000)
-            .output()
+                .output()
         {
             if output.status.success() {
                 adapters.extend(
@@ -142,9 +111,8 @@ fn probe_gpu(app: tauri::AppHandle) -> Value {
             if !python.is_file() {
                 return Err("推理环境尚未安装".into());
             }
-            let output = Command::new(python)
+            let output = platform::command(python)
                 .args(["-I", "-B", "-c", INFERENCE_WORKER, "--probe-cuda"])
-                .creation_flags(0x08000000)
                 .output()
                 .map_err(|error| error.to_string())?;
             let probe: Value = serde_json::from_slice(&output.stdout)
@@ -157,6 +125,31 @@ fn probe_gpu(app: tauri::AppHandle) -> Value {
         .unwrap_or_else(|reason| json!({ "cudaAvailable": false, "reason": reason }));
     status["adapters"] = json!(adapters);
     status
+}
+
+#[cfg(target_os = "macos")]
+fn probe_gpu(_: tauri::AppHandle) -> Value {
+    json!({"platform":"macos", "cudaAvailable":false, "adapters":[], "computeTypes":["int8"]})
+}
+
+fn worker_command(app: &tauri::AppHandle) -> Result<Command, String> {
+    #[cfg(windows)]
+    {
+        let mut command = platform::command(inference_python(app)?);
+        command.args(["-I", "-B", "-u", "-c", INFERENCE_WORKER]);
+        Ok(command)
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let worker = app
+            .path()
+            .resolve("runtime/mono-stt-worker", BaseDirectory::Resource)
+            .map_err(|error| error.to_string())?;
+        if !worker.is_file() {
+            return Err("未找到内置的 macOS 转录引擎，请从安装包重新安装".into());
+        }
+        Ok(platform::command(worker))
+    }
 }
 
 #[tauri::command]
@@ -218,17 +211,11 @@ fn run_worker(
     fs::create_dir_all(&audio_dir).map_err(|e| e.to_string())?;
     let id = uuid::Uuid::new_v4().to_string();
     let wav = audio_dir.join(format!("{id}.wav"));
-    let mut child = Command::new(inference_python(&app)?)
-        .arg("-I")
-        .arg("-B")
-        .arg("-u")
-        .arg("-c")
-        .arg(INFERENCE_WORKER)
+    let mut child = worker_command(&app)?
         .arg(source)
         .arg(model_dir)
         .arg(&wav)
         .arg(options.to_string())
-        .creation_flags(0x08000000)
         .stdout(Stdio::piped())
         .spawn()
         .map_err(|e| format!("无法启动推理环境：{e}"))?;

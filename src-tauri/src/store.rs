@@ -59,9 +59,7 @@ CREATE TABLE IF NOT EXISTS kv (
 impl Store {
     pub fn open(app: &tauri::AppHandle) -> Result<Self, String> {
         let legacy_dir = app.path().app_local_data_dir().map_err(|e| e.to_string())?;
-        let data_dir = std::env::current_exe()
-            .map_err(|e| e.to_string())?
-            .with_file_name("data");
+        let data_dir = crate::platform::data_root()?.join("data");
         fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
         let database = data_dir.join("mono.db");
         let legacy_database = legacy_dir.join("mono.db");

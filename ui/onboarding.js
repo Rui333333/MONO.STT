@@ -34,6 +34,7 @@ const MODELS = [
 ];
 
 const bridge = parent.onboardingBridge;
+const macOS = /Macintosh/.test(navigator.userAgent);
 const supported = new Map([
   ['whisper-large-v3-turbo', 'faster-whisper-large-v3-turbo'],
   ['whisper-large-v3', 'faster-whisper-large-v3'],
@@ -42,7 +43,7 @@ const escapeText = value => String(value ?? '').replace(/[&<>"']/g, char =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[char]);
 const state = {
   step: 0,
-  device: bridge.settings.computeDevice === 'cpu' ? 'CPU' : 'GPU',
+  device: macOS || bridge.settings.computeDevice === 'cpu' ? 'CPU' : 'GPU',
   model: [...supported].find(([,id])=>id===bridge.model)?.[0] || 'whisper-large-v3-turbo',
   readyModels: {},
   tested: false,
@@ -78,7 +79,7 @@ function viewDevice() {
     </div>
 
     <div class="tile-grid" role="radiogroup" aria-label="转录设备">
-      <button type="button" class="tile" data-action="device-GPU" aria-pressed="${state.device === 'GPU'}" ${(state.busy || !state.hardware?.cudaAvailable) ? 'disabled' : ''}>
+      ${macOS ? '' : `<button type="button" class="tile" data-action="device-GPU" aria-pressed="${state.device === 'GPU'}" ${(state.busy || !state.hardware?.cudaAvailable) ? 'disabled' : ''}>
         <div>
           <div class="tile-top">
             <span class="tile-title">GPU 加速</span>
@@ -90,7 +91,7 @@ function viewDevice() {
           <span>CUDA</span>
           <strong>推荐</strong>
         </div>
-      </button>
+      </button>`}
 
       <button type="button" class="tile" data-action="device-CPU" aria-pressed="${state.device === 'CPU'}" ${state.busy ? 'disabled' : ''}>
         <div>

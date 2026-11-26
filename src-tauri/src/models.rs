@@ -1,9 +1,8 @@
 use std::{
     collections::HashMap,
     fs,
-    os::windows::process::CommandExt,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::Stdio,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
@@ -41,8 +40,7 @@ pub fn directory(configured: Option<&str>) -> Result<PathBuf, String> {
         }
         return Ok(path);
     }
-    let executable = std::env::current_exe().map_err(|error| error.to_string())?;
-    Ok(executable.parent().ok_or("找不到应用目录")?.join("models"))
+    Ok(crate::platform::data_root()?.join("models"))
 }
 
 pub fn installed(path: &Path) -> bool {
@@ -186,10 +184,7 @@ fn fetch(
     if cancelled.load(Ordering::Relaxed) {
         return Ok(false);
     }
-    let curl = PathBuf::from(std::env::var_os("SystemRoot").ok_or("缺少 SystemRoot")?)
-        .join("System32")
-        .join("curl.exe");
-    let mut child = Command::new(curl)
+    let mut child = crate::platform::command(crate::platform::curl()?)
         .args([
             "--disable",
             "--fail",
@@ -212,7 +207,6 @@ fn fetch(
         ])
         .arg(file)
         .arg(url)
-        .creation_flags(0x08000000)
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()

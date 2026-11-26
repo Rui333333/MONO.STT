@@ -1,21 +1,21 @@
 use serde_json::{json, Value};
+#[cfg(windows)]
 use std::{
     ffi::OsStr,
+    os::windows::ffi::OsStrExt,
+    ptr::{null, null_mut},
+};
+use std::{
     fs,
     io::{self, Write},
-    os::windows::{ffi::OsStrExt, process::CommandExt},
-    path::PathBuf,
-    process::{Command, Stdio},
-    ptr::{null, null_mut},
+    process::Stdio,
     sync::{Mutex, TryLockError},
     time::Duration,
 };
 use tauri::Manager;
-use windows_sys::Win32::{
-    Security::Credentials::{
-        CredFree, CredReadW, CredWriteW, CREDENTIALW, CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC,
-    },
-    UI::{Shell::ShellExecuteW, WindowsAndMessaging::SW_SHOWNORMAL},
+#[cfg(windows)]
+use windows_sys::Win32::Security::Credentials::{
+    CredFree, CredReadW, CredWriteW, CREDENTIALW, CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC,
 };
 
 const API: &str = "https://open.feishu.cn/open-apis";
@@ -26,10 +26,12 @@ const BATCH_SIZE: usize = 50;
 #[derive(Default)]
 pub struct FeishuPublish(Mutex<()>);
 
+#[cfg(windows)]
 fn wide(value: impl AsRef<OsStr>) -> Vec<u16> {
     value.as_ref().encode_wide().chain(Some(0)).collect()
 }
 
+#[cfg(windows)]
 fn credentials() -> Result<Option<Value>, String> {
     let mut raw = null_mut::<CREDENTIALW>();
     if unsafe {
@@ -61,6 +63,7 @@ fn credentials() -> Result<Option<Value>, String> {
     parsed.map(Some)
 }
 
+#[cfg(windows)]
 fn store_credentials(value: &Value) -> Result<(), String> {
     let mut blob = serde_json::to_vec(value).map_err(|e| e.to_string())?;
     if blob.len() > 2560 {
@@ -81,6 +84,24 @@ fn store_credentials(value: &Value) -> Result<(), String> {
             io::Error::last_os_error()
         ))
     }
+}
+
+#[cfg(target_os = "macos")]
+fn credentials() -> Result<Option<Value>, String> {
+    match security_framework::passwords::get_generic_password(CREDENTIAL_KEY, "credentials") {
+        Ok(bytes) => serde_json::from_slice(&bytes)
+            .map(Some)
+            .map_err(|_| "无法读取飞书凭据，请重新配置".into()),
+        Err(error) if error.code() == -25300 => Ok(None),
+        Err(error) => Err(format!("无法读取 macOS 钥匙串：{error}")),
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn store_credentials(value: &Value) -> Result<(), String> {
+    let bytes = serde_json::to_vec(value).map_err(|error| error.to_string())?;
+    security_framework::passwords::set_generic_password(CREDENTIAL_KEY, "credentials", &bytes)
+        .map_err(|error| format!("无法保存到 macOS 钥匙串：{error}"))
 }
 
 struct ApiError {
@@ -130,11 +151,8 @@ fn api(
             curl_quote(&body.to_string())
         ));
     }
-    let curl = PathBuf::from(
-        std::env::var_os("SystemRoot").ok_or_else(|| ApiError::unknown("缺少 SystemRoot"))?,
-    )
-    .join(r"System32\curl.exe");
-    let mut child = Command::new(curl)
+    let curl = crate::platform::curl().map_err(ApiError::unknown)?;
+    let mut child = crate::platform::command(curl)
         .args([
             "--disable",
             "--silent",
@@ -149,7 +167,6 @@ fn api(
             "--config",
             "-",
         ])
-        .creation_flags(0x08000000)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -447,20 +464,7 @@ pub fn feishu_open_permissions() -> Result<(), String> {
 }
 
 fn open_feishu_url(url: &str) -> Result<(), String> {
-    let result = unsafe {
-        ShellExecuteW(
-            null_mut(),
-            wide("open").as_ptr(),
-            wide(url).as_ptr(),
-            null(),
-            null(),
-            SW_SHOWNORMAL,
-        )
-    };
-    if (result as isize) <= 32 {
-        return Err("无法打开飞书链接".into());
-    }
-    Ok(())
+    crate::platform::open_url(url)
 }
 
 #[derive(Debug)]

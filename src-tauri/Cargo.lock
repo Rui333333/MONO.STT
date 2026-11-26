@@ -2336,6 +2336,7 @@ dependencies = [
  "flate2",
  "hound",
  "rusqlite",
+ "security-framework",
  "serde_json",
  "tauri",
  "tauri-build",

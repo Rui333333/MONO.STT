@@ -107,6 +107,11 @@ function createGpuStatus(React, jsx) {
       return () => { active = false; };
     }, [attempt]);
 
+    if (status?.platform === 'macos') {
+      return jsx('section', {className:'gpu-status', 'aria-label':'计算设备', children:
+        jsx('div', {className:'gpu-status-summary', children:'macOS 预览版 · CPU 转录'}),
+      });
+    }
     const availability = !status ? '检测中…' : status.failed ? '检测失败' :
       status.cudaAvailable ? 'CUDA 可用' : 'CUDA 不可用';
     return jsx('section', {className:'gpu-status', 'aria-label':'显卡与 CUDA', children:[

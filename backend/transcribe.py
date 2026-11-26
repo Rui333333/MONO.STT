@@ -65,6 +65,18 @@ def probe_cuda():
         return {"cudaAvailable": False, "reason": str(error)}
 
 
+def probe_runtime():
+    import av
+    import ctranslate2
+    import numpy
+    import onnxruntime
+    import faster_whisper
+
+    return {"av": av.__version__, "ctranslate2": ctranslate2.__version__,
+            "numpy": numpy.__version__, "onnxruntime": onnxruntime.__version__,
+            "fasterWhisper": faster_whisper.__version__}
+
+
 def recognize(audio, model_dir, device, duration, options, compute_type="int8", device_index=0):
     from faster_whisper import WhisperModel
     label = f"CUDA · {compute_type}" if device == "cuda" else "CPU"
@@ -129,7 +141,7 @@ def main():
     scale=max(max(peaks),1)
     metadata=dict(fileSizeBytes=source.stat().st_size,waveform=[max(.08,p/scale) for p in peaks])
     device = options.get("computeDevice","auto")
-    if device in ("auto", "cuda"):
+    if os.name == "nt" and device in ("auto", "cuda"):
         try:
             devices = cuda_modes()
             for index, mode in devices:
@@ -148,7 +160,10 @@ def main():
 if __name__ == "__main__":
     handles = configure_dll_search()
     try:
-        emit("result", **(probe_cuda() if sys.argv[1:] == ["--probe-cuda"] else main()))
+        if sys.argv[1:] == ["--probe-runtime"]:
+            emit("result", **probe_runtime())
+        else:
+            emit("result", **(probe_cuda() if sys.argv[1:] == ["--probe-cuda"] else main()))
     except Exception as exc:
         emit("error", message=str(exc))
         sys.exit(1)
