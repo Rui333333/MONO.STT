@@ -3,7 +3,7 @@ name: macOS Apple Silicon preview
 on:
   workflow_dispatch:
   push:
-    branches: [codex/macos-preview]
+    branches: [codex/macos-0.1.5]
 
 permissions:
   contents: read
