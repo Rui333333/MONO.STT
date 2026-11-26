@@ -10,12 +10,14 @@ mod updates;
 
 use serde_json::{json, Value};
 use std::{
+    collections::HashMap,
     fs,
     io::{BufRead, BufReader},
-    path::PathBuf,
-    process::{Command, Stdio},
+    path::{Path, PathBuf},
+    process::{Child, Command, Stdio},
+    sync::{Arc, Mutex},
 };
-use tauri::{path::BaseDirectory, Emitter, Manager};
+use tauri::{ipc::Channel, path::BaseDirectory, Manager};
 use tauri_plugin_dialog::DialogExt;
 
 #[cfg(windows)]
@@ -180,16 +182,144 @@ async fn export_file(app: tauri::AppHandle, name: String, content: String) -> Re
     Ok(true)
 }
 
+const TRANSCRIPTION_CANCELLED: &str = "TRANSCRIPTION_CANCELLED";
+
+#[derive(Default)]
+struct TranscriptionProcess {
+    child: Option<Child>,
+    cancelled: bool,
+    finished: bool,
+}
+
+impl TranscriptionProcess {
+    fn cancel(&mut self) -> Result<bool, String> {
+        if self.finished {
+            return Ok(false);
+        }
+        if let Some(child) = &mut self.child {
+            if child.try_wait().map_err(|e| e.to_string())?.is_some() {
+                return Ok(false);
+            }
+            child.kill().map_err(|e| e.to_string())?;
+        }
+        self.cancelled = true;
+        Ok(true)
+    }
+}
+
+#[cfg(test)]
+mod transcription_tests {
+    use super::*;
+
+    #[test]
+    fn cancellation_stops_a_running_worker_and_is_safe_before_start() {
+        let mut pending = TranscriptionProcess::default();
+        assert!(pending.cancel().unwrap());
+        assert!(pending.cancelled);
+
+        #[cfg(windows)]
+        let mut command = {
+            let mut command = platform::command("powershell.exe");
+            command.args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "Start-Sleep -Seconds 30",
+            ]);
+            command
+        };
+        #[cfg(target_os = "macos")]
+        let mut command = {
+            let mut command = Command::new("/bin/sleep");
+            command.arg("30");
+            command
+        };
+        let mut running = TranscriptionProcess {
+            child: Some(command.spawn().unwrap()),
+            ..Default::default()
+        };
+        assert!(running.cancel().unwrap());
+        assert!(!running.child.take().unwrap().wait().unwrap().success());
+        assert!(running.cancelled);
+        running.finished = true;
+        assert!(!running.cancel().unwrap());
+    }
+}
+
+type ProcessHandle = Arc<Mutex<TranscriptionProcess>>;
+
+#[derive(Default)]
+struct Transcriptions(Mutex<HashMap<uuid::Uuid, ProcessHandle>>);
+
+fn discard_interrupted_audio(data_dir: &Path) {
+    let Ok(entries) = fs::read_dir(data_dir.join("audio")) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path
+            .extension()
+            .is_some_and(|extension| extension == "transcribing")
+            && path
+                .file_stem()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| uuid::Uuid::parse_str(name).is_ok())
+        {
+            let _ = fs::remove_file(path);
+        }
+    }
+}
+
+#[tauri::command]
+fn cancel_transcription(app: tauri::AppHandle, job_id: String) -> Result<bool, String> {
+    let job_id = uuid::Uuid::parse_str(&job_id).map_err(|e| e.to_string())?;
+    let process = app
+        .state::<Transcriptions>()
+        .0
+        .lock()
+        .unwrap()
+        .get(&job_id)
+        .cloned();
+    match process {
+        Some(process) => process.lock().unwrap().cancel(),
+        None => Ok(false),
+    }
+}
+
 #[tauri::command]
 async fn transcribe(
     app: tauri::AppHandle,
+    job_id: String,
     source: String,
     model: String,
     options: Value,
+    events: Channel<Value>,
 ) -> Result<Value, String> {
-    tauri::async_runtime::spawn_blocking(move || run_worker(app, source, model, options, false))
-        .await
-        .map_err(|e| e.to_string())?
+    let job_id = uuid::Uuid::parse_str(&job_id).map_err(|e| e.to_string())?;
+    let processes = app.state::<Transcriptions>();
+    let process = ProcessHandle::default();
+    {
+        let mut jobs = processes.0.lock().unwrap();
+        if jobs.contains_key(&job_id) {
+            return Err("此转录任务已在运行".into());
+        }
+        jobs.insert(job_id, process.clone());
+    }
+    let _ = events.send(json!({ "kind": "ready" }));
+    let worker_app = app.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        run_worker(
+            worker_app,
+            source,
+            model,
+            options,
+            &process,
+            Some((job_id, events)),
+        )
+    })
+    .await;
+    processes.0.lock().unwrap().remove(&job_id);
+    result.map_err(|e| e.to_string())?
 }
 
 fn run_worker(
@@ -197,7 +327,8 @@ fn run_worker(
     source: String,
     model: String,
     options: Value,
-    preview: bool,
+    process: &Mutex<TranscriptionProcess>,
+    live: Option<(uuid::Uuid, Channel<Value>)>,
 ) -> Result<Value, String> {
     let _task = updates::task(&app)?;
     if !models::valid_model(&model) {
@@ -211,46 +342,78 @@ fn run_worker(
     fs::create_dir_all(&audio_dir).map_err(|e| e.to_string())?;
     let id = uuid::Uuid::new_v4().to_string();
     let wav = audio_dir.join(format!("{id}.wav"));
-    let mut child = worker_command(&app)?
+    let staging = wav.with_extension("transcribing");
+    let record_id = live.as_ref().map_or(id, |(job_id, _)| job_id.to_string());
+    let mut command = worker_command(&app)?;
+    command
         .arg(source)
         .arg(model_dir)
-        .arg(&wav)
+        .arg(&staging)
         .arg(options.to_string())
-        .stdout(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("无法启动推理环境：{e}"))?;
+        .stdout(Stdio::piped());
+    let stdout = {
+        let mut state = process.lock().unwrap();
+        if state.cancelled {
+            return Err(TRANSCRIPTION_CANCELLED.into());
+        }
+        let mut child = command
+            .spawn()
+            .map_err(|e| format!("无法启动推理环境：{e}"))?;
+        let stdout = child.stdout.take().expect("worker stdout is piped");
+        state.child = Some(child);
+        stdout
+    };
     let mut result = None;
     let mut error = String::new();
-    for line in BufReader::new(child.stdout.take().unwrap())
-        .lines()
-        .map_while(Result::ok)
-    {
+    for line in BufReader::new(stdout).lines().map_while(Result::ok) {
         if let Ok(mut event) = serde_json::from_str::<Value>(&line) {
             match event["kind"].as_str() {
                 Some("result") => {
                     event["audio"] = json!(wav);
-                    event["id"] = json!(id);
+                    event["id"] = json!(record_id);
                     result = Some(event);
                 }
                 Some("error") => error = event["message"].as_str().unwrap_or_default().to_string(),
-                Some("status") => {
-                    let _ = app.emit("progress", event);
+                Some("status" | "segment" | "reset" | "metadata") => {
+                    if let Some((_, channel)) = &live {
+                        let _ = channel.send(event);
+                    }
                 }
                 _ => {}
             }
         }
     }
-    if child.wait().map_err(|e| e.to_string())?.success() {
+    let (cancelled, mut child) = {
+        let mut state = process.lock().unwrap();
+        state.finished = true;
+        (
+            state.cancelled,
+            state.child.take().expect("worker was started"),
+        )
+    };
+    let status = child.wait();
+    if !cancelled && status.as_ref().is_ok_and(|status| status.success()) {
         if let Some(value) = result {
-            if preview {
-                fs::remove_file(&wav).map_err(|e| e.to_string())?;
+            if live.is_none() {
+                fs::remove_file(&staging).map_err(|e| e.to_string())?;
             } else {
-                app.state::<store::Store>().allow_playback(&app, &wav)?;
+                if let Err(error) = fs::rename(&staging, &wav) {
+                    let _ = fs::remove_file(&staging);
+                    return Err(error.to_string());
+                }
+                if let Err(error) = app.state::<store::Store>().allow_playback(&app, &wav) {
+                    let _ = fs::remove_file(&wav);
+                    return Err(error);
+                }
             }
             return Ok(value);
         }
     }
-    let _ = fs::remove_file(wav);
+    let _ = fs::remove_file(staging);
+    if cancelled {
+        return Err(TRANSCRIPTION_CANCELLED.into());
+    }
+    status.map_err(|e| e.to_string())?;
     Err(if error.is_empty() {
         "推理进程意外退出，请检查运行环境".into()
     } else {
@@ -275,7 +438,8 @@ async fn onboarding_sample(
             input.to_string_lossy().into_owned(),
             model,
             options,
-            true,
+            &Mutex::default(),
+            None,
         );
         let _ = fs::remove_file(input);
         let mut result = result?;
@@ -314,7 +478,9 @@ async fn init_store(app: tauri::AppHandle) -> Result<(), String> {
         static INITIALIZING: std::sync::Mutex<()> = std::sync::Mutex::new(());
         let _guard = INITIALIZING.lock().map_err(|e| e.to_string())?;
         if app.try_state::<store::Store>().is_none() {
-            app.manage(store::Store::open(&app)?);
+            let store = store::Store::open(&app)?;
+            discard_interrupted_audio(store.data_dir());
+            app.manage(store);
         }
         Ok(())
     })
@@ -374,6 +540,7 @@ fn main() {
         .manage(models::ModelDownloads::default())
         .manage(recording::Recorder::default())
         .manage(updates::Activity::default())
+        .manage(Transcriptions::default())
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             restore_main(app)
         }))
@@ -422,6 +589,7 @@ fn main() {
             export_file,
             batch_export::export_zip,
             transcribe,
+            cancel_transcription,
             gpu_status,
             open_cuda_download,
             open_feishu_credentials,
@@ -432,11 +600,13 @@ fn main() {
             feishu::feishu_open_document,
             feishu::feishu_open_permissions,
             store_recording,
+            recording::list_native_microphones,
             recording::start_native_recording,
             recording::native_recording_level,
             recording::stop_native_recording,
             recording::discard_native_recording,
             store::store_load,
+            store::store_audio_status,
             store::store_save,
             store::store_delete_records,
             store::store_kv_get,
@@ -450,6 +620,13 @@ fn main() {
             models::download_model,
             models::cancel_model_download
         ])
-        .run(tauri::generate_context!())
-        .expect("无法启动墨声");
+        .build(tauri::generate_context!())
+        .expect("无法启动墨声")
+        .run(|app, event| {
+            if matches!(event, tauri::RunEvent::Exit) {
+                for process in app.state::<Transcriptions>().0.lock().unwrap().values() {
+                    let _ = process.lock().unwrap().cancel();
+                }
+            }
+        });
 }

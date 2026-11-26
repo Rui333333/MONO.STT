@@ -83,13 +83,42 @@ where
     )
 }
 
-fn open_stream(path: &Path, capture: &Arc<Mutex<Capture>>) -> Result<(cpal::Stream, u32), String> {
-    let device = cpal::default_host()
-        .default_input_device()
-        .ok_or("没有找到麦克风。请检查接入设备和 Windows 麦克风隐私设置。")?;
-    let supported = device
-        .default_input_config()
-        .map_err(|e| format!("无法读取麦克风设置：{e}"))?;
+#[tauri::command]
+pub fn list_native_microphones() -> Result<Vec<String>, String> {
+    let mut names: Vec<_> = cpal::default_host()
+        .input_devices()
+        .map_err(|e| e.to_string())?
+        .filter_map(|device| device.name().ok())
+        .collect();
+    names.sort();
+    names.dedup();
+    Ok(names)
+}
+
+fn open_stream(
+    path: &Path,
+    capture: &Arc<Mutex<Capture>>,
+    microphone: Option<&str>,
+) -> Result<(cpal::Stream, u32), String> {
+    let host = cpal::default_host();
+    let device = match microphone {
+        Some(name) => host
+            .input_devices()
+            .map_err(|e| e.to_string())?
+            .find(|device| device.name().is_ok_and(|candidate| candidate == name))
+            .ok_or("所选麦克风已断开，请重新选择。")?,
+        None => host
+            .default_input_device()
+            .ok_or("没有找到默认麦克风，请选择可用的输入设备。")?,
+    };
+    let name = device.name().unwrap_or_else(|_| "麦克风".into());
+    let supported = device.default_input_config().map_err(|error| {
+        if error.to_string().contains("0x88890008") {
+            format!("「{name}」的录音格式不可用，请在录音页面选择其他麦克风。")
+        } else {
+            format!("无法读取「{name}」的麦克风设置：{error}")
+        }
+    })?;
     let config = supported.config();
     let sample_rate = config.sample_rate.0;
     let writer = hound::WavWriter::create(
@@ -118,7 +147,10 @@ fn open_stream(path: &Path, capture: &Arc<Mutex<Capture>>) -> Result<(cpal::Stre
 }
 
 #[tauri::command]
-pub async fn start_native_recording(app: AppHandle) -> Result<String, String> {
+pub async fn start_native_recording(
+    app: AppHandle,
+    microphone: Option<String>,
+) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let task = crate::updates::task(&app)?;
         let state = app.state::<Recorder>();
@@ -140,17 +172,18 @@ pub async fn start_native_recording(app: AppHandle) -> Result<String, String> {
             .name("mono-stt-microphone".into())
             .spawn(move || {
                 let _task = task;
-                let (stream, sample_rate) = match open_stream(&path, &worker_capture) {
-                    Ok(value) => value,
-                    Err(error) => {
-                        if let Ok(mut capture) = worker_capture.lock() {
-                            drop(capture.writer.take());
+                let (stream, sample_rate) =
+                    match open_stream(&path, &worker_capture, microphone.as_deref()) {
+                        Ok(value) => value,
+                        Err(error) => {
+                            if let Ok(mut capture) = worker_capture.lock() {
+                                drop(capture.writer.take());
+                            }
+                            let _ = fs::remove_file(&path);
+                            let _ = ready_tx.send(Err(error));
+                            return;
                         }
-                        let _ = fs::remove_file(&path);
-                        let _ = ready_tx.send(Err(error));
-                        return;
-                    }
-                };
+                    };
                 let keep = ready_tx.send(Ok(())).is_ok() && stop_rx.recv() == Ok(true);
                 drop(stream);
                 let result = (|| {

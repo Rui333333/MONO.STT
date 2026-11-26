@@ -123,8 +123,49 @@ function readingSegmentAt(segments, endTimes, time) {
   return segment && segment.startSec <= time ? segment.id : null;
 }
 
+function useReadingAudio(React, record, notify) {
+  const [availability, setAvailability] = React.useState(null);
+  const current = React.useRef(null);
+  const audioKey = record.audioPath ? record.id + ':' + record.audioPath : null;
+  React.useLayoutEffect(() => {
+    const session = {audioKey, request:0};
+    current.current = session;
+    return () => { current.current = null; };
+  }, [audioKey]);
+
+  async function check(failed) {
+    const session = current.current;
+    if (!audioKey || session?.audioKey !== audioKey) return;
+    if (!failed && session.feedback) return;
+    session.feedback = failed;
+    const request = ++session.request;
+    let status;
+    try { status = await desktop.invoke('store_audio_status', {recordId:record.id}); }
+    catch { status = 'unavailable'; }
+    if (current.current !== session || request !== session.request) return;
+    session.feedback = false;
+    setAvailability({audioKey, status});
+    if (failed) notify(status === 'missing' ? '找不到音频文件，可能已被移动或删除。'
+      : '无法播放音频，请检查文件是否可读取。');
+  }
+
+  React.useEffect(() => { void check(false); }, [audioKey]);
+  return {
+    missing:availability?.audioKey === audioKey && availability?.status === 'missing',
+    probe:() => { void check(false); },
+    failed:error => { if (error?.name !== 'AbortError') void check(true); },
+    playing:() => {
+      if (audioKey && current.current?.audioKey === audioKey) {
+        current.current.request++;
+        current.current.feedback = false;
+        setAvailability(null);
+      }
+    },
+  };
+}
+
 function createReadingTimeline(React, jsx, formatTime, DeleteIcon) {
-  const Row = React.memo(function TranscriptRow({segment, active, canRemove, actions}) {
+  const Row = React.memo(function TranscriptRow({segment, active, canRemove, readOnly, actions}) {
     const lines = Math.max(1, Math.ceil(segment.text.length / 44));
     return jsx('div', {
       'data-reading-row':active ? '' : undefined,
@@ -132,7 +173,7 @@ function createReadingTimeline(React, jsx, formatTime, DeleteIcon) {
       style:{'--reading-row-estimate':(lines * 22.5 + 10 + (segment.speaker ? 17 : 0)) + 'px'},
       children:[
         jsx('button', {
-          type:'button', onClick:() => actions.current.seek(segment.startSec),
+          type:'button', disabled:readOnly, onClick:() => actions.current.seek(segment.startSec),
           className:'reading-timestamp font-mono text-[11.5px] font-medium tabular-nums pt-1 w-11 shrink-0 text-left',
           children:formatTime(segment.startSec),
         }),
@@ -142,7 +183,7 @@ function createReadingTimeline(React, jsx, formatTime, DeleteIcon) {
             children:segment.speaker,
           }),
           jsx('textarea', {
-            value:segment.text, onChange:event => actions.current.edit(segment.id, event.target.value),
+            value:segment.text, readOnly, onChange:event => actions.current.edit(segment.id, event.target.value),
             rows:lines, placeholder:'输入校对内容...',
             className:'reading-segment w-full text-[15px] text-neutral-800 dark:text-neutral-200 bg-transparent resize-none border-none p-0 focus:outline-none focus:ring-0',
           }),
@@ -156,7 +197,7 @@ function createReadingTimeline(React, jsx, formatTime, DeleteIcon) {
     });
   });
 
-  const Group = React.memo(function TranscriptGroup({segments, activeId, canRemove, actions, viewport}) {
+  const Group = React.memo(function TranscriptGroup({segments, activeId, canRemove, readOnly, actions, viewport}) {
     const element = React.useRef(null);
     const measuredHeight = React.useRef(0);
     const [nearby, setNearby] = React.useState(false);
@@ -198,12 +239,12 @@ function createReadingTimeline(React, jsx, formatTime, DeleteIcon) {
         if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
       },
       children:mounted ? segments.map(segment => jsx(Row, {
-        segment, active:segment.id === activeId, canRemove, actions,
+        segment, active:segment.id === activeId, canRemove, readOnly, actions,
       }, segment.id)) : null,
     });
   });
 
-  return React.memo(function ReadingTimeline({segments, activeId, query, canRemove, actions, viewport}) {
+  return React.memo(function ReadingTimeline({segments, activeId, query, canRemove, readOnly, actions, viewport}) {
     const [groups, groupIds] = React.useMemo(() => {
       const groups = [];
       const groupIds = new Map();
@@ -218,7 +259,7 @@ function createReadingTimeline(React, jsx, formatTime, DeleteIcon) {
     const activeGroup = groupIds.get(activeId);
     return jsx('div', {className:'reading-rows', children:groups.length ?
       groups.map((group,index) => jsx(Group, {
-        segments:group, activeId:index === activeGroup ? activeId : null, canRemove, actions, viewport,
+        segments:group, activeId:index === activeGroup ? activeId : null, canRemove, readOnly, actions, viewport,
       }, group[0].id)) :
       jsx('p',{className:'py-10 text-center text-[13px] text-neutral-400',children:`未在正文中找到「${query}」`}),
     });

@@ -80,6 +80,17 @@ class MonoStoreService {
     }).catch(error => this.report(error));
   }
 
+  saveTranscription({audioUrl, ...record}) {
+    return this.enqueue(async () => {
+      if (!this.kv.libraryCreated) {
+        await this.invoke('store_kv_set', {key:'libraryCreated', value:'1'});
+        this.kv.libraryCreated = '1';
+      }
+      await this.invoke('store_save', {records:[record]});
+      this.records = [record, ...this.records.filter(item => item.id !== record.id)];
+    });
+  }
+
   async deleteRecords(ids) {
     if (ids.some(id => this.deleting.has(id))) throw Error('正在删除此记录');
     for (const id of ids) this.deleting.add(id);

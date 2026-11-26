@@ -2,6 +2,8 @@
 import json
 import os
 import ctypes
+from math import isfinite
+import re
 from pathlib import Path
 import site
 import sys
@@ -77,22 +79,51 @@ def probe_runtime():
             "fasterWhisper": faster_whisper.__version__}
 
 
+def transcription_terms(options):
+    replacements = {}
+    hints = {}
+    for term in options.get("terms") or []:
+        original = term.get("from", "").strip()
+        corrected = term.get("to", "").strip()
+        if corrected:
+            hints[corrected] = None
+            if original and original != corrected:
+                replacements[original] = corrected
+    originals = sorted(replacements, key=len, reverse=True)
+    pattern = re.compile("|".join(map(re.escape, originals))) if originals else None
+    return ", ".join(hints) or None, pattern, replacements
+
+
 def recognize(audio, model_dir, device, duration, options, compute_type="int8", device_index=0):
     from faster_whisper import WhisperModel
     label = f"CUDA · {compute_type}" if device == "cuda" else "CPU"
+    emit("reset")
     emit("status", message=f"加载模型 · {label}")
     model = WhisperModel(str(model_dir), device=device, device_index=device_index,
                          compute_type=compute_type,
                          local_files_only=True, cpu_threads=int(options.get("cpuThreads", 8)))
-    segments, info = model.transcribe(str(audio), beam_size=3, vad_filter=options.get("vadFilter", True),
+    hotwords, correction_pattern, replacements = transcription_terms(options)
+    segments, info = model.transcribe(str(audio), beam_size=3, vad_filter=options.get("vadFilter", True), hotwords=hotwords,
                                       language=options.get("language") if options.get("language") in {"zh","en","ja"} else None)
     result = []
     last_progress = -1
     for segment in segments:
+        # Decoder timestamps can extend into padding beyond the last WAV sample.
+        start, end = segment.start, segment.end
+        if not isfinite(start) or not isfinite(end):
+            continue
+        start = max(0.0, start)
+        end = min(duration, end)
+        if start >= end:
+            continue
         text = segment.text.strip()
         if text:
-            result.append(dict(start=segment.start, end=segment.end, text=text))
-        progress = min(99, int(100 * segment.end / duration))
+            if correction_pattern:
+                text = correction_pattern.sub(lambda match: replacements[match.group()], text)
+            row = dict(start=start, end=end, text=text)
+            result.append(row)
+            emit("segment", **row)
+        progress = min(99, int(100 * end / duration))
         if progress > last_progress:
             emit("status", message=f"正在转写 · {label} · {progress}%")
             last_progress = progress
@@ -129,6 +160,8 @@ def main():
     duration = extract_audio(source, output)
     if duration <= 0:
         raise ValueError("音轨为空")
+    file_size = source.stat().st_size
+    emit("metadata", duration=duration, fileSizeBytes=file_size)
     # Sample equal time intervals without loading the whole recording.
     import numpy as np
     with wave.open(str(output),"rb") as wav:
@@ -139,7 +172,7 @@ def main():
             samples=np.frombuffer(wav.readframes(max(1,min(2048,frames//72))),dtype="<i2")
             peaks.append(float(np.abs(samples.astype(float)).max()) if samples.size else 0)
     scale=max(max(peaks),1)
-    metadata=dict(fileSizeBytes=source.stat().st_size,waveform=[max(.08,p/scale) for p in peaks])
+    metadata=dict(fileSizeBytes=file_size,waveform=[max(.08,p/scale) for p in peaks])
     device = options.get("computeDevice","auto")
     if os.name == "nt" and device in ("auto", "cuda"):
         try:

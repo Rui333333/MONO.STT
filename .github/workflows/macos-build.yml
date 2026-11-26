@@ -1,16 +1,10 @@
-name: macOS Apple Silicon preview
+name: Build macOS Apple Silicon package
 
 on:
-  workflow_dispatch:
-  push:
-    branches: [codex/macos-0.1.5]
+  workflow_call:
 
 permissions:
   contents: read
-
-concurrency:
-  group: macos-preview-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   build:
@@ -20,6 +14,8 @@ jobs:
       MACOSX_DEPLOYMENT_TARGET: '14.0'
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

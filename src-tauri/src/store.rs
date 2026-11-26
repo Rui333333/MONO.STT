@@ -438,6 +438,35 @@ pub fn store_load(app: tauri::AppHandle, state: State<'_, Store>) -> Result<Valu
     Ok(snapshot)
 }
 
+/// Inspect the archived audio linked to a record.
+#[tauri::command]
+pub fn store_audio_status(
+    state: State<'_, Store>,
+    record_id: String,
+) -> Result<&'static str, String> {
+    let path: Option<String> = state
+        .conn
+        .lock()
+        .map_err(|e| e.to_string())?
+        .query_row(
+            "SELECT audio_path FROM records WHERE id=?1",
+            [record_id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?
+        .flatten();
+    let Some(path) = path.filter(|path| !path.is_empty()) else {
+        return Ok("unbound");
+    };
+    match fs::metadata(path) {
+        Ok(metadata) if metadata.is_file() => Ok("present"),
+        Ok(_) => Ok("missing"),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok("missing"),
+        Err(_) => Ok("unavailable"),
+    }
+}
+
 /// Write updated records. Deletion is only performed by the explicit command.
 #[tauri::command]
 pub fn store_save(state: State<'_, Store>, records: Vec<Value>) -> Result<(), String> {

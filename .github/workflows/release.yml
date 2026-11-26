@@ -1,0 +1,126 @@
+name: Windows and macOS packages
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: packages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      number: ${{ steps.version.outputs.number }}
+      release: ${{ steps.version.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate the shared version
+        id: version
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import tomllib
+          from pathlib import Path
+
+          root = Path("src-tauri")
+          version = json.loads((root / "tauri.conf.json").read_text())["version"]
+          package = tomllib.loads((root / "Cargo.toml").read_text())["package"]
+          lock = tomllib.loads((root / "Cargo.lock").read_text())["package"]
+          if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+              raise SystemExit("Expected a stable MAJOR.MINOR.PATCH version")
+          if package["version"] != version or not any(
+              entry["name"] == package["name"] and entry["version"] == version for entry in lock
+          ):
+              raise SystemExit("Tauri, Cargo and Cargo.lock versions must match")
+          tagged = os.environ["GITHUB_EVENT_NAME"] == "push"
+          if tagged and os.environ["GITHUB_REF_NAME"] != f"v{version}":
+              raise SystemExit(f"Expected the release tag v{version}")
+          release = tagged and os.environ["GITHUB_REPOSITORY"] == "Rui333333/MONO.STT"
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              print(f"number={version}", f"release={str(release).lower()}", sep="\n", file=output)
+          PY
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test the application
+        run: cargo test --release --locked --manifest-path src-tauri/Cargo.toml --bin mono-stt
+      - name: Build a Windows test installer
+        if: needs.version.outputs.release != 'true'
+        run: ./build-windows.ps1 -Slim
+      - name: Build the Windows installer with an updater signature
+        if: needs.version.outputs.release == 'true'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if (!$env:TAURI_SIGNING_PRIVATE_KEY) { throw 'Configure the TAURI_SIGNING_PRIVATE_KEY Actions secret.' }
+          ./build-windows.ps1 -Slim -Signed
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MONO.STT-Windows-x64
+          path: src-tauri/target/release/bundle/windows/
+          if-no-files-found: error
+
+  macos:
+    needs: version
+    uses: ./.github/workflows/macos-build.yml
+
+  draft:
+    needs: [version, windows, macos]
+    if: needs.version.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: MONO.STT-Windows-x64
+          path: windows
+      - uses: actions/download-artifact@v4
+        with:
+          name: MONO.STT-macOS-arm64
+          path: macos
+      - name: Attach both installers to one draft Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.number }}
+        run: |
+          set -euo pipefail
+          setup="windows/MONO.STT_${VERSION}_x64-setup.exe"
+          dmg="macos/MONO.STT_${VERSION}_arm64.dmg"
+          assets=("$setup" "$setup.sig" windows/latest.json "$dmg")
+          for asset in "${assets[@]}"; do
+            test -s "$asset"
+          done
+          if draft=$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft); then
+            if [ "$draft" = true ]; then
+              gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+            else
+              echo "Release $GITHUB_REF_NAME is already published."
+            fi
+          else
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" --repo "$GITHUB_REPOSITORY" \
+              --verify-tag --draft --generate-notes --title "MONO.STT $VERSION"
+          fi

@@ -36,8 +36,6 @@ MONO.STT 是一款 Windows 和 macOS 桌面转录工具。导入音频、视频�
 
 ### Windows
 
-Windows 代码位于 [`codex/windows-0.1.5`](https://github.com/Rui333333/MONO.STT/tree/codex/windows-0.1.5)。
-
 在 Windows x64 上准备 PowerShell 7、Python、Rust MSVC 工具链、Visual Studio C++ 生成工具和 Windows SDK。从仓库根目录运行：
 
 ```powershell
@@ -50,7 +48,7 @@ Windows 发布、代码签名和自动更新配置见 [UPDATES.md](UPDATES.md)�
 
 ### macOS
 
-macOS 代码位于 [`codex/macos-0.1.5`](https://github.com/Rui333333/MONO.STT/tree/codex/macos-0.1.5)。该分支的构建流程会打包 arm64 转录引擎和应用，生成 DMG，再挂载安装包运行 CPU 示例转录。GitHub Actions 的构建产物名为 `MONO.STT-macOS-arm64`。 [macOS 构建流程](https://github.com/Rui333333/MONO.STT/blob/codex/macos-0.1.5/.github/workflows/macos-preview.yml)
+在 GitHub Actions 运行 **Windows and macOS packages**，从同一份代码生成 Windows x64 EXE 和 macOS Apple Silicon DMG。macOS 构建会打包 arm64 转录引擎，并挂载 DMG 运行 CPU 示例转录。试打包和标签发布见 [发布说明](UPDATES.md)。
 
 ## 项目结构
 

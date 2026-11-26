@@ -11,7 +11,88 @@ function transferProgress(jsx, name, value, compact = false) {
   });
 }
 
-function transferReview(jsx, Dropdown, {draft, icons, onAdd, onStart, onCancel, onRemove, onLanguage, language}) {
+function TransferTermsDialog({React, jsx, file, onSave, onClose}) {
+  const dialog = React.useRef(null);
+  const addedInput = React.useRef(null);
+  const focusNew = React.useRef(false);
+  const nextId = React.useRef(file.terms?.length || 1);
+  const [rows, setRows] = React.useState(() => file.terms?.length
+    ? file.terms.map((term, id) => ({...term, id}))
+    : [{id:0, from:'', to:''}]);
+  const [error, setError] = React.useState('');
+  React.useLayoutEffect(() => {
+    const panel = dialog.current;
+    panel.showModal();
+    panel.querySelector('input').focus();
+    return () => panel.close();
+  }, []);
+  React.useLayoutEffect(() => {
+    if (focusNew.current) {
+      focusNew.current = false;
+      addedInput.current?.focus();
+    }
+  }, [rows.length]);
+
+  function update(id, field, value) {
+    setRows(items => items.map(row => row.id === id ? {...row, [field]:value} : row));
+    setError('');
+  }
+  function save(event) {
+    event.preventDefault();
+    const terms = rows.map(({from,to}) => ({from:from.trim(), to:to.trim()}))
+      .filter(({from,to}) => from || to);
+    if (terms.some(({to}) => !to)) return setError('请为已填写的词语输入正确写法。');
+    const originals = terms.map(({from}) => from).filter(Boolean);
+    if (new Set(originals).size !== originals.length) return setError('同一个易错词只需填写一次。');
+    dialog.current.close();
+    onSave(file.path, terms);
+  }
+  function dismiss() {
+    dialog.current.close();
+    onClose();
+  }
+  return jsx('dialog', {
+    ref:dialog, className:'transfer-terms', 'aria-labelledby':'transfer-terms-title',
+    onCancel:event => {event.preventDefault(); dismiss();},
+    children:jsx('form', {onSubmit:save, children:[
+      jsx('header', {children:[
+        jsx('h2', {id:'transfer-terms-title', children:'词语纠正'}),
+        jsx('p', {className:'transfer-terms-file', title:file.name, children:file.name}),
+        jsx('p', {children:'词语仅用于此文件。只填正确写法时，该词将作为识别提示。'}),
+      ]}),
+      jsx('div', {className:'transfer-terms-body', children:[
+        jsx('div', {className:'transfer-term-columns', 'aria-hidden':true, children:[
+          jsx('span', {children:'易错词（选填）'}),
+          jsx('span', {children:'正确写法'}),
+        ]}),
+        !rows.length && jsx('p', {className:'transfer-terms-empty', children:'暂无词语'}),
+        ...rows.map((row, index) => jsx('div', {className:'transfer-term-row', children:[
+          jsx('input', {ref:index===rows.length-1 ? addedInput : undefined, 'aria-label':'易错词（选填）',
+            value:row.from, placeholder:index===0 ? '例如 爱菲尔铁塔' : '', onChange:event=>update(row.id,'from',event.target.value)}),
+          jsx('input', {'aria-label':'正确写法', value:row.to,
+            placeholder:index===0 ? '例如 埃菲尔铁塔' : '', onChange:event=>update(row.id,'to',event.target.value)}),
+          jsx('button', {
+            type:'button', className:'transfer-review-button', 'aria-label':`移除第 ${index + 1} 条词语`,
+            onClick:()=>{setRows(items=>items.filter(item=>item.id!==row.id)); setError('');}, children:'×',
+          }),
+        ]}, row.id)),
+      ]}),
+      error && jsx('p', {className:'transfer-terms-error', role:'alert', children:error}),
+      jsx('footer', {children:[
+        jsx('button', {type:'button', className:'transfer-review-button transfer-terms-add',
+          onClick:()=>{
+            const id = nextId.current++;
+            focusNew.current = true;
+            setRows(items=>[...items,{id,from:'',to:''}]);
+          }, children:'＋ 添加词语'}),
+        jsx('button', {type:'button', className:'transfer-review-button', onClick:dismiss, children:'取消'}),
+        jsx('button', {type:'submit', className:'transfer-review-button transfer-review-start', children:'保存'}),
+      ]}),
+    ]}),
+  });
+}
+
+function transferReview(jsx, Dropdown, {draft, icons, onAdd, onStart, onCancel, onRemove, onLanguage, language, termsEditor, onEditTerms}) {
   const icon = type => jsx(icons[type], {'aria-hidden':true, size:17, strokeWidth:1.7});
   const languages = [
     ['auto','自动识别'], ['zh','中文'], ['en','英语'], ['ja','日语'], ['zh-en','中英混合'],
@@ -36,7 +117,7 @@ function transferReview(jsx, Dropdown, {draft, icons, onAdd, onStart, onCancel, 
         ]}),
       ]}),
       draft.length ? jsx('ul', {className:'transfer-file-list', 'aria-labelledby':'transfer-file-heading',
-        children:draft.map(({name,path}) => {
+        children:draft.map(({name,path,terms}) => {
           const dot = name.lastIndexOf('.');
           const extension = dot > 0 ? name.slice(dot + 1) : '';
           const separator = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
@@ -48,12 +129,15 @@ function transferReview(jsx, Dropdown, {draft, icons, onAdd, onStart, onCancel, 
               jsx('span', {title:path, children:directory}),
             ]}),
             jsx('span', {className:'transfer-file-extension', 'aria-hidden':true, children:extension.toUpperCase()}),
+            jsx('button', {type:'button', className:'transfer-review-button transfer-file-terms',
+              'aria-label':'词语纠正 ' + name, 'aria-haspopup':'dialog', onClick:()=>onEditTerms(path),
+              children:terms?.length ? `词语纠正 · ${terms.length}` : '词语纠正'}),
             jsx('button', {type:'button', className:'transfer-review-button transfer-file-remove',
               title:'移除文件', 'aria-label':'移除 ' + name, onClick:event=>{
                 const row = event.currentTarget.closest('li');
                 const next = row.nextElementSibling || row.previousElementSibling;
                 const fallback = row.closest('.transfer-review').querySelector('.transfer-review-add');
-                (next?.querySelector('button') || fallback).focus();
+                (next?.querySelector('.transfer-file-remove') || fallback).focus();
                 onRemove(path);
               }, children:icon('remove')}),
           ]}, path);
@@ -66,32 +150,55 @@ function transferReview(jsx, Dropdown, {draft, icons, onAdd, onStart, onCancel, 
           disabled:!draft.length, onClick:onStart, children:'开始转录'}),
       ]}),
     }),
+    termsEditor,
   ]});
 }
 
-function transferPage(jsx, Dropdown, state) {
-  if (state.review) return transferReview(jsx, Dropdown, state);
-  const {jobs,onRetry,onResult}=state;
-  const button=(text,click)=>jsx('button',{type:'button',onClick:click,children:text});
-  const finished=jobs.filter(job=>job.stage==='completed').length;
-  const failed=jobs.filter(job=>job.stage==='error').length;
-  const done=jobs.length===finished+failed;
-  const title=done?(failed?'部分任务需要处理':'转录完成'):'转录进度';
-  return jsx('section',{className:'transfer-page',children:[
-    jsx('header',{children:jsx('h2',{children:title})}),
-    jsx('div',{className:'transfer-body',children:[
-      jsx('p',{className:'transfer-meta',children:finished+' / '+jobs.length+' 个文件已完成'}),
-      ...jobs.map(item=>{
-        const {stage}=item;
-        const active=['inferring','decoding'].includes(stage);
-        return jsx('div',{className:'transfer-row',children:[
-          jsx('strong',{children:item.name||item.fileName}),
-          jsx('small',{role:'status',children:stage==='error'?item.error:stage==='completed'?'已完成':stage==='queued'?'等待处理':item.message||'正在提取音轨'}),
-          active && transferProgress(jsx,item.fileName,item.measured?item.progress:undefined),
-          stage==='error' && button('重试',()=>onRetry(item.id)),
-          stage==='completed' && button('查看逐字稿',()=>onResult(item.recordId))
-        ]},item.id||item.path);
+function transferJobAction(jsx, job, onCancel, onRetry) {
+  const retry = queueRetryStages.has(job.stage);
+  if (!retry && !['queued', 'decoding', 'inferring'].includes(job.stage)) return null;
+  const label = retry ? '重试' : '取消';
+  return jsx('button', {
+    type:'button', className:'queue-action', 'aria-label':label + ' ' + job.fileName,
+    onClick:() => (retry ? onRetry : onCancel)(job.id), children:label,
+  });
+}
+
+function transferJobCard(jsx, job, {selected, onOpen, onCancel, onRetry, onRemove, CloseIcon}) {
+  const active = queueActiveStages.has(job.stage);
+  return jsx('div', {className:'queue-card', 'data-selected':selected || undefined, children:[
+    jsx('div', {className:'queue-card-top', children:[
+      jsx('button', {
+        type:'button', className:'queue-card-name', title:job.fileName, 'aria-current':selected || undefined,
+        onClick:() => onOpen(job.id), children:job.fileName,
       }),
-    ]})
+      (job.stage === 'completed' || queueRetryStages.has(job.stage)) && jsx('button', {
+        type:'button', className:'queue-remove', title:'移出队列',
+        'aria-label':'移出队列 ' + job.fileName, onClick:() => onRemove(job.id),
+        children:jsx(CloseIcon, {size:14, 'aria-hidden':true}),
+      }),
+    ]}),
+    jsx('div', {className:'queue-card-status', children:[
+      jsx('span', {children:queueLabels[job.stage]}),
+      job.measured && active && jsx('span', {className:'font-mono tabular-nums', children:job.progress + '%'}),
+      transferJobAction(jsx, job, onCancel, onRetry),
+    ]}),
+    active && transferProgress(jsx, job.fileName, job.measured ? job.progress : undefined, true),
+  ]}, job.id);
+}
+
+function transferLiveStatus(jsx, job, onCancel, onRetry) {
+  const active = queueActiveStages.has(job.stage);
+  const label = job.stage === 'error' ? job.error
+    : job.stage === 'interrupted' ? '上次转录中断，重试将从头开始。'
+    : ['decoding', 'inferring'].includes(job.stage) ? job.message || queueLabels[job.stage]
+    : queueLabels[job.stage];
+  return jsx('div', {className:'queue-live-status', children:[
+    jsx('div', {className:'queue-live-message', children:[
+      jsx('span', {role:active ? undefined : 'status', children:label}),
+      transferJobAction(jsx, job, onCancel, onRetry),
+    ]}),
+    (active || job.stage === 'queued') && transferProgress(jsx, job.fileName,
+      job.stage === 'queued' ? 0 : job.measured ? job.progress : undefined, true),
   ]});
 }

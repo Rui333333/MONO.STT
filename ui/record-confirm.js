@@ -33,6 +33,8 @@ function useNativeRecording(react, {model, onRecordingStateChange, onEnqueueFile
   const [seconds, setSeconds] = react.useState(0);
   const [error, setError] = react.useState(null);
   const [waveform, setWaveform] = react.useState(() => Array(32).fill(.12));
+  const [microphones, setMicrophones] = react.useState([]);
+  const [microphone, setMicrophone] = react.useState(() => window.MonoStore.getItem('native_microphone') || '');
   const session = react.useRef(null);
   const changing = react.useRef(false);
   const mounted = react.useRef(true);
@@ -103,7 +105,7 @@ function useNativeRecording(react, {model, onRecordingStateChange, onEnqueueFile
     setBusy(true);
     onRecordingStateChange(true);
     try {
-      const id = await invoke('start_native_recording');
+      const id = await invoke('start_native_recording', {microphone:microphone || null});
       if (!mounted.current) {
         await invoke('stop_native_recording', {id, keep: false});
         return;
@@ -128,6 +130,9 @@ function useNativeRecording(react, {model, onRecordingStateChange, onEnqueueFile
 
   react.useEffect(() => {
     mounted.current = true;
+    invoke('list_native_microphones').then(names => {
+      if (mounted.current && Array.isArray(names)) setMicrophones(names);
+    }).catch(console.error);
     return () => {
       mounted.current = false;
       clearTimeout(meterTimer.current);
@@ -138,5 +143,15 @@ function useNativeRecording(react, {model, onRecordingStateChange, onEnqueueFile
     };
   }, []);
 
-  return {recording, busy, seconds, error, waveform, start, stop: () => stop()};
+  function selectMicrophone(name) {
+    setMicrophone(name);
+    setError(null);
+    window.MonoStore.setItem('native_microphone', name);
+  }
+  const choices = [{value:'', label:'系统默认麦克风'}, ...microphones.map(name => ({value:name, label:name}))];
+  if (microphone && !microphones.includes(microphone)) {
+    choices.push({value:microphone, label:microphone});
+  }
+  return {recording, busy, seconds, error, waveform, start, stop: () => stop(),
+    microphone, choices, selectMicrophone};
 }

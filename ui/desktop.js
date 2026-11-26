@@ -1,6 +1,6 @@
 /* Native services used by the supplied InkVoice interface. */
 const desktop = (() => {
-  const {invoke,convertFileSrc} = window.__TAURI__.core;
+  const {invoke,convertFileSrc,Channel} = window.__TAURI__.core;
   function normalize(r) {
     if (!r.name) return r.audioPath ? {...r,audioUrl:convertFileSrc(r.audioPath)} : r;
     return {id:r.id,title:r.name.replace(/\.[^.]+$/,''),sourceFileName:r.name,
@@ -17,18 +17,61 @@ const desktop = (() => {
       ? {...r,audioUrl:convertFileSrc(r.audioPath)} : r);
   }
   function save(records) { return window.MonoStore.save(records); }
-  async function run(job,update) {
-    const off=await window.__TAURI__.event.listen('progress',({payload})=>{
-      const match=payload.message.match(/(\d+)%/);
-      update({stage:payload.message.includes('音轨')?'decoding':'inferring',message:payload.message,measured:!!match,progress:match?Number(match[1]):0});
+  async function run(job, update, ready) {
+    let pending = {};
+    let segments = [];
+    let reset = false;
+    let segmentCount = 0;
+    let timer;
+    let closed = false;
+    function flush() {
+      clearTimeout(timer);
+      timer = undefined;
+      if (!segments.length && !reset && !Object.keys(pending).length) return;
+      update(pending, segments, reset);
+      pending = {};
+      segments = [];
+      reset = false;
+    }
+    const events = new Channel(event => {
+      if (closed) return;
+      switch (event.kind) {
+        case 'ready':
+          ready();
+          return;
+        case 'status': {
+          const match = event.message.match(/ · (\d+)%$/);
+          Object.assign(pending, {stage:event.message === '正在提取音轨' ? 'decoding' : 'inferring',
+            message:event.message, ...(match ? {progress:Number(match[1]), measured:true} : {})});
+          break;
+        }
+        case 'metadata':
+          Object.assign(pending, {durationSec:event.duration, fileSizeBytes:event.fileSizeBytes});
+          break;
+        case 'reset':
+          reset = true;
+          segmentCount = 0;
+          segments = [];
+          Object.assign(pending, {progress:0, measured:false});
+          break;
+        case 'segment':
+          segments.push({id:job.id + '-' + segmentCount++, startSec:event.start, endSec:event.end, text:event.text});
+          break;
+        default:
+          return;
+      }
+      if (timer === undefined) timer = setTimeout(flush, 120);
     });
     try {
-      const r=await invoke('transcribe',{source:job.path,model:job.modelId,options:job.options});
-      const record=normalize({...r,name:job.fileName,created:Date.now(),model:job.modelId});
+      const r = await invoke('transcribe',{jobId:job.id,source:job.path,model:job.modelId,options:job.options,events});
+      const record = normalize({...r,name:job.fileName,created:job.createdAt,model:job.modelId});
       /* sourcePath lets the store remove the app-owned recording together
          with the WAV. External files are rejected by the Rust path guard. */
       return {...record,sourcePath:job.path,modelName:job.modelName};
-    } finally {off();}
+    } finally {
+      closed = true;
+      flush();
+    }
   }
   async function paths(files) {
     return Promise.all(files.map(async f=>typeof f==='string' ? {path:f,name:f.split(/[\\/]/).pop()} :
