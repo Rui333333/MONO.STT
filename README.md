@@ -1,13 +1,13 @@
 # MONO.STT
 
-MONO.STT 是一款 Windows 和 macOS 桌面转录工具。导入音频、视频或使用麦克风录音，即可在本机生成带时间戳的逐字稿。转录结果可以回听、校对和导出，适合整理访谈、课程和会议记录。
+MONO.STT 是一款 Windows 和 macOS 桌面转录工具。导入音频或视频，即可在本机生成带时间戳的逐字稿。转录结果可以回听、校对和导出，适合整理访谈、课程和会议记录。
 
 ## 下载与安装
 
-| 平台 | 计算设备 | 0.1.5 安装包 |
+| 平台 | 计算设备 | 0.1.7 安装包 |
 | --- | --- | --- |
-| Windows x64 | CPU、兼容的 NVIDIA CUDA | [下载 EXE](https://github.com/Rui333333/MONO.STT/releases/download/v0.1.5/MONO.STT_0.1.5_x64-setup.exe) |
-| macOS 14 及以上，Apple Silicon（M 系列） | CPU | [下载 DMG](https://github.com/Rui333333/MONO.STT/releases/download/v0.1.5/MONO.STT_0.1.5_arm64.dmg) |
+| Windows x64 | CPU、兼容的 NVIDIA CUDA | [下载 EXE](https://github.com/Rui333333/MONO.STT/releases/download/v0.1.7/MONO.STT_0.1.7_x64-setup.exe) |
+| macOS 14 及以上，Apple Silicon（M 系列） | CPU | [下载 DMG](https://github.com/Rui333333/MONO.STT/releases/download/v0.1.7/MONO.STT_0.1.7_arm64.dmg) |
 
 - **Windows** 双击 EXE 并按提示安装。可以在「偏好设置 → 通用 → 检查更新」手动检查新版。
 - **macOS** 打开 DMG，将 MONO.STT 拖入「应用程序」。当前安装包尚未完成 Apple 公证，首次打开可能会出现系统提示。macOS 在线更新暂未启用。 [Apple 官方说明](https://support.apple.com/zh-cn/102445)
@@ -16,7 +16,7 @@ MONO.STT 是一款 Windows 和 macOS 桌面转录工具。导入音频、视频�
 
 ## 功能
 
-- **本地转录** 支持 Whisper Large v3 Turbo 和 Whisper Large v3。可拖入音视频，也可在应用里录音。
+- **本地转录** 支持 Whisper Large v3 Turbo 和 Whisper Large v3。可拖入音视频，也可通过文件选择器导入。
 - **时间轴校对** 点击时间戳跳转回听，可调整播放速度、开启滚动跟随并修改逐字稿。
 - **文件导出** 单条记录可导出 TXT、Markdown 和 SRT。批量导出支持搜索、分页和跨页勾选，可将 TXT、SRT 或两种格式打包进一个 ZIP。
 - **飞书云文档** 配置自建应用凭据后，可把转录内容写入飞书，更新或删除已关联的文档。
@@ -25,12 +25,12 @@ MONO.STT 是一款 Windows 和 macOS 桌面转录工具。导入音频、视频�
 
 ## 数据位置
 
-| 平台 | 转录、录音和设置 | 默认模型目录 |
+| 平台 | 转录和设置 | 默认模型目录 |
 | --- | --- | --- |
 | Windows | 安装目录下的 `data/` | 安装目录下的 `models/` |
 | macOS | `~/Library/Application Support/MONO.STT/data/` | `~/Library/Application Support/MONO.STT/models/` |
 
-两个平台都可以在偏好设置中修改模型目录。转录记录保存在 `data/mono.db`，回听音轨和录音分别保存在 `data/audio/` 和 `data/recordings/`。
+两个平台都可以在偏好设置中修改模型目录。转录记录保存在 `data/mono.db`，回听音轨保存在 `data/audio/`。
 
 ## 从源码构建
 

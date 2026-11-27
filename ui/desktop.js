@@ -65,7 +65,7 @@ const desktop = (() => {
     try {
       const r = await invoke('transcribe',{jobId:job.id,source:job.path,model:job.modelId,options:job.options,events});
       const record = normalize({...r,name:job.fileName,created:job.createdAt,model:job.modelId});
-      /* sourcePath lets the store remove the app-owned recording together
+      /* sourcePath lets the store remove app-owned media together
          with the WAV. External files are rejected by the Rust path guard. */
       return {...record,sourcePath:job.path,modelName:job.modelName};
     } finally {
@@ -76,7 +76,7 @@ const desktop = (() => {
   async function paths(files) {
     return Promise.all(files.map(async f=>typeof f==='string' ? {path:f,name:f.split(/[\\/]/).pop()} :
       typeof f.path==='string' ? {path:f.path,name:f.name} :
-      {path:await invoke('store_recording',new Uint8Array(await f.arrayBuffer())),name:f.name}));
+      {path:await invoke('stage_imported_media',new Uint8Array(await f.arrayBuffer())),name:f.name}));
   }
   return {invoke,prepare,load,save,run,paths};
 })();

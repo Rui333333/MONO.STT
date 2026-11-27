@@ -101,6 +101,7 @@ impl Store {
         for root in [&self.data_dir, &self.legacy_dir] {
             for (folder, extension) in [
                 ("audio", "wav"),
+                ("imports", "media"),
                 ("recordings", "webm"),
                 ("recordings", "wav"),
             ] {

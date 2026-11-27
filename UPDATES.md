@@ -34,7 +34,7 @@ pwsh -File .\build-windows.ps1 -Slim -Signed -WindowsSignScript C:\Signing\sign.
 
 在仓库的 Actions Secrets 配置 `TAURI_SIGNING_PRIVATE_KEY`（私钥文件内容）和 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`（私钥密码）。私钥和密码请单独备份。应用已内置对应公钥，后续发布必须沿用同一套密钥。
 
-同步更新 `src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 和 `src-tauri/Cargo.lock` 内的应用版本。将版本提交推送到 GitHub，再给该提交打对应标签。例如 `0.1.6` 对应 `v0.1.6`。
+同步更新 `src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 和 `src-tauri/Cargo.lock` 内的应用版本。将版本提交推送到 GitHub，再给该提交打对应标签。例如 `0.1.7` 对应 `v0.1.7`。
 
 两端都构建成功后，工作流将 EXE、DMG、Windows 更新签名 `.sig` 和 `latest.json` 放到同一个 GitHub Release 草稿。核对后手动发布为 Latest。Windows 在线更新继续使用 `latest.json`，macOS 通过 DMG 安装，当前仍需手动升级。
 

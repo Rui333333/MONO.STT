@@ -24,13 +24,13 @@ const MonoUpdates = (() => {
   function ensureDialog() {
     if (dialog) return;
     dialog = document.createElement('dialog');
-    dialog.className = 'record-confirm update-dialog';
+    dialog.className = 'update-dialog';
     dialog.setAttribute('aria-labelledby', 'mono-update-title');
     dialog.innerHTML = '<h2 id="mono-update-title">软件更新</h2>' +
       '<p class="update-version"></p><p class="update-status" role="status" aria-live="polite"></p>' +
       '<div class="update-notes" hidden></div>' +
       '<progress aria-label="更新下载进度" max="100" hidden></progress>' +
-      '<div class="record-actions"><button type="button" data-close autofocus>关闭</button>' +
+      '<div class="update-actions"><button type="button" data-close autofocus>关闭</button>' +
       '<button type="button" data-install hidden>下载并安装</button></div>';
     dialog.querySelector('[data-close]').onclick = () => dialog.close();
     dialog.querySelector('[data-install]').onclick = install;
@@ -74,7 +74,7 @@ const MonoUpdates = (() => {
   async function install() {
     if (!available || installing) return;
     if (busy) {
-      status('请等录音或转录队列结束，再安装更新。');
+      status('请等转录队列结束，再安装更新。');
       return;
     }
     const close = dialog.querySelector('[data-close]');

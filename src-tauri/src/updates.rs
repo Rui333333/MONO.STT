@@ -35,7 +35,7 @@ impl Activity {
         }
         if update {
             if active.tasks > 0 {
-                return Err("请等录音、转录或模型下载结束，再安装更新。".into());
+                return Err("请等转录或模型下载结束，再安装更新。".into());
             }
             active.updating = true;
         } else {

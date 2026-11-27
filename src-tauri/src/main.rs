@@ -4,7 +4,6 @@ mod batch_export;
 mod feishu;
 mod models;
 mod platform;
-mod recording;
 mod store;
 mod updates;
 
@@ -454,16 +453,16 @@ async fn onboarding_sample(
 }
 
 #[tauri::command]
-fn store_recording(
+fn stage_imported_media(
     app: tauri::AppHandle,
     request: tauri::ipc::Request<'_>,
 ) -> Result<String, String> {
     let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
-        return Err("录音数据无效".into());
+        return Err("导入的媒体数据无效".into());
     };
-    let dir = app.state::<store::Store>().data_dir().join("recordings");
+    let dir = app.state::<store::Store>().data_dir().join("imports");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let path = dir.join(format!("{}.webm", uuid::Uuid::new_v4()));
+    let path = dir.join(format!("{}.media", uuid::Uuid::new_v4()));
     fs::write(&path, bytes).map_err(|e| e.to_string())?;
     Ok(path.to_string_lossy().into_owned())
 }
@@ -538,7 +537,6 @@ fn main() {
     tauri::Builder::default()
         .manage(feishu::FeishuPublish::default())
         .manage(models::ModelDownloads::default())
-        .manage(recording::Recorder::default())
         .manage(updates::Activity::default())
         .manage(Transcriptions::default())
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
@@ -599,12 +597,7 @@ fn main() {
             feishu::feishu_delete_document,
             feishu::feishu_open_document,
             feishu::feishu_open_permissions,
-            store_recording,
-            recording::list_native_microphones,
-            recording::start_native_recording,
-            recording::native_recording_level,
-            recording::stop_native_recording,
-            recording::discard_native_recording,
+            stage_imported_media,
             store::store_load,
             store::store_audio_status,
             store::store_save,

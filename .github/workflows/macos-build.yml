@@ -58,7 +58,6 @@ jobs:
           app="$mount/MONO.STT.app"
           codesign --verify --deep --strict "$app"
           lipo -archs "$app/Contents/MacOS/mono-stt" | grep -x arm64
-          plutil -extract NSMicrophoneUsageDescription raw "$app/Contents/Info.plist"
           worker="$app/Contents/Resources/runtime/mono-stt-worker"
           "$worker" --probe-runtime
           model="$RUNNER_TEMP/whisper-tiny"

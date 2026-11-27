@@ -38,14 +38,16 @@ header[data-tauri-drag-region]>div:first-child,header[data-tauri-drag-region]>di
 .mono-control.restore i:after{left:0;bottom:0}
 .mono-control.close i:before,.mono-control.close i:after{content:"";position:absolute;top:4px;left:-1px;width:12px;height:1px;background:currentColor;transform:rotate(45deg)}
 .mono-control.close i:after{transform:rotate(-45deg)}
-.record-confirm{margin:auto;padding:22px;width:min(360px,90vw);border:1px solid #ddd;border-radius:12px;background:white;color:#171717;box-shadow:0 12px 36px #0002}
-.record-confirm::backdrop{background:#0005}
-.record-confirm h2{font-size:17px;font-weight:600}.record-details{margin:5px 0 14px;color:#737373;font-size:12px}
-.record-confirm audio{width:100%;height:35px}.record-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
-.record-actions button{padding:5px 13px;border:1px solid #8885;border-radius:6px;font-size:13px;cursor:pointer}
-.record-actions button:last-child{background:#171717;color:#fff}.dark .record-confirm{background:#171717;color:#fafafa;border-color:#444}.dark .record-actions button:last-child{background:#fafafa;color:#171717}.dark .record-details{color:#aaa}
 .update-check-button{border:1px solid #8885;border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer}
 .update-check-button:hover{background:#8882}
+.update-dialog{margin:auto;padding:22px;width:min(360px,90vw);border:1px solid #ddd;border-radius:12px;background:white;color:#171717;box-shadow:0 12px 36px #0002}
+.update-dialog::backdrop{background:#0005}
+.update-dialog h2{font-size:17px;font-weight:600}
+.update-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
+.update-actions button{padding:5px 13px;border:1px solid #8885;border-radius:6px;font-size:13px;cursor:pointer}
+.update-actions button:last-child{background:#171717;color:#fff}
+.dark .update-dialog{background:#171717;color:#fafafa;border-color:#444}
+.dark .update-actions button:last-child{background:#fafafa;color:#171717}
 .update-dialog .update-version,.update-dialog .update-status{margin:8px 0;font-size:13px;overflow-wrap:anywhere}
 .update-dialog .update-version{color:#737373}
 .dark .update-dialog .update-version{color:#a3a3a3}
