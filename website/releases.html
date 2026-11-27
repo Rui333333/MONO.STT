@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="MONO.STT 是 Windows 与 macOS 上的本地转录工具。导入音频或视频，即可在本机生成带时间戳的逐字稿，支持回听校对、批量导出与飞书云文档。">
+  <title>历史版本 - MONO.STT</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="page-shell grid-bg">
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark"><img src="assets/wave-text.svg" width="32" height="32" alt=""></span> MONO.STT
+      </a>
+      <nav class="nav" aria-label="主导航">
+        <a href="index.html#features">产品</a>
+        <a href="pricing.html">开源</a>
+        <a href="changelog.html">更新日志</a>
+        <a href="releases.html" class="router-link-active router-link-exact-active" aria-current="page">历史版本</a>
+        <a href="docs.html">文档</a>
+      </nav>
+      <a href="index.html#download" class="header-download">下载</a>
+      <button class="menu-btn" type="button" aria-label="打开菜单">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+      </button>
+    </div>
+    <div class="mobile-nav wrap">
+      <a href="index.html#features">产品</a>
+      <a href="pricing.html">开源</a>
+      <a href="changelog.html">更新日志</a>
+      <a href="releases.html">历史版本</a>
+      <a href="docs.html">文档</a>
+      <a href="index.html#download">下载</a>
+    </div>
+  </header>
+
+  <main class="subpage wrap">
+    <h1>历史版本</h1>
+    <p class="lead">所有已发布的客户端安装包，最新版本排在最前面。首页下载区始终提供当前最新包，全部文件托管在 GitHub Releases。</p>
+    <div class="card-list hist-list">
+      <article class="card hist-card">
+        <div class="hist-head">
+          <h2> v0.1.7 <span class="hist-latest">最新</span></h2>
+          <time>2026-11-27 10:05</time>
+        </div>
+        <ul class="hist-notes">
+          <li>移除应用内录音、麦克风选择和相关权限</li>
+          <li>「新建转录」直接进入音视频导入页，支持文件选择和拖放</li>
+          <li>已有转录记录的回听、编辑和导出功能继续可用</li>
+        </ul>
+        <div class="hist-files">
+          <a class="hist-file" href="https://github.com/Rui333333/MONO.STT/releases/download/v0.1.7/MONO.STT_0.1.7_x64-setup.exe"><strong>Windows x64 · EXE</strong><span>139.5 MB</span></a>
+          <a class="hist-file" href="https://github.com/Rui333333/MONO.STT/releases/download/v0.1.7/MONO.STT_0.1.7_arm64.dmg"><strong>macOS Apple Silicon · DMG</strong><span>108.2 MB</span></a>
+        </div>
+      </article>
+      <article class="card hist-card">
+        <div class="hist-head">
+          <h2> v0.1.6 </h2>
+          <time>2026-11-26 18:15</time>
+        </div>
+        <ul class="hist-notes">
+          <li>转录片段逐段显示，队列支持取消、重试和重启恢复</li>
+          <li>每个音视频文件可单独配置纠错词和热词</li>
+          <li>转录时间戳限制在实际音轨范围内</li>
+        </ul>
+        <div class="hist-files">
+          <a class="hist-file" href="https://github.com/Rui333333/MONO.STT/releases/download/v0.1.6/MONO.STT_0.1.6_x64-setup.exe"><strong>Windows x64 · EXE</strong><span>139.6 MB</span></a>
+          <a class="hist-file" href="https://github.com/Rui333333/MONO.STT/releases/download/v0.1.6/MONO.STT_0.1.6_arm64.dmg"><strong>macOS Apple Silicon · DMG</strong><span>106.7 MB</span></a>
+        </div>
+      </article>
+      <article class="card hist-card">
+        <div class="hist-head">
+          <h2> v0.1.5 </h2>
+          <time>2026-11-25 18:10</time>
+        </div>
+        <ul class="hist-notes">
+          <li>首个 macOS Apple Silicon 版本，最低系统版本 macOS 14</li>
+          <li>批量导出 SRT、TXT 或全部格式到一个 ZIP</li>
+          <li>新版 Windows 安装器、卸载确认与飞书云文档删除</li>
+        </ul>
+        <div class="hist-files">
+          <a class="hist-file" href="https://github.com/Rui333333/MONO.STT/releases/download/v0.1.5/MONO.STT_0.1.5_x64-setup.exe"><strong>Windows x64 · EXE</strong><span>139.5 MB</span></a>
+          <a class="hist-file" href="https://github.com/Rui333333/MONO.STT/releases/download/v0.1.5/MONO.STT_0.1.5_arm64.dmg"><strong>macOS Apple Silicon · DMG</strong><span>108.2 MB</span></a>
+        </div>
+      </article>
+      <article class="card hist-card">
+        <div class="hist-head">
+          <h2> v0.1.4 </h2>
+          <time>2026-11-25 10:43</time>
+        </div>
+        <ul class="hist-notes">
+          <li>首个支持应用内更新的版本，0.1.3 用户需覆盖安装</li>
+          <li>在「偏好设置 → 通用 → 检查更新」查看当前版本与可用更新</li>
+          <li>改进确认转录页与「更多操作」菜单</li>
+        </ul>
+        <div class="hist-files">
+          <a class="hist-file" href="https://github.com/Rui333333/MONO.STT/releases/download/v0.1.4/MONO.STT_0.1.4_x64-setup.exe"><strong>Windows x64 · EXE</strong><span>95.0 MB</span></a>
+        </div>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <h2>产品与协议</h2>
+          <a href="index.html">MONO.STT 首页</a>
+          <a href="pricing.html">开源与获取</a>
+          <a href="docs.html">使用文档</a>
+          <a href="https://github.com/Rui333333/MONO.STT/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT 许可证</a>
+          <a href="docs.html#privacy">数据与隐私</a>
+        </div>
+        <div>
+          <h2>资源与支持</h2>
+          <a href="docs.html">使用文档</a>
+          <a href="changelog.html">更新日志</a>
+          <a href="releases.html">历史版本</a>
+          <a href="https://github.com/Rui333333/MONO.STT/issues" target="_blank" rel="noopener noreferrer">问题反馈</a>
+        </div>
+        <div>
+          <h2>联系我们</h2>
+          <p>Rui333333 · 开源维护者</p>
+          <a href="https://github.com/Rui333333/MONO.STT/issues" target="_blank" rel="noopener noreferrer">GitHub Issues</a>
+          <p>转录与回听在本机完成，素材不上传。</p>
+        </div>
+      </div>
+      <p class="copy">© 2026 Rui333333 · MONO.STT · MIT License</p>
+      <!-- 上线部署到国内域名时，请把下面两个链接替换为自己的 ICP / 公安备案信息 -->
+      <p class="beian"><a href="https://github.com/Rui333333/MONO.STT" target="_blank" rel="noopener noreferrer">GitHub 仓库</a><a href="https://github.com/Rui333333/MONO.STT/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">开源许可 · MIT</a></p>
+    </div>
+  </footer>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

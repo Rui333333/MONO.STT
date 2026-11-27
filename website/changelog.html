@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="MONO.STT 是 Windows 与 macOS 上的本地转录工具。导入音频或视频，即可在本机生成带时间戳的逐字稿，支持回听校对、批量导出与飞书云文档。">
+  <title>更新日志 - MONO.STT</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="page-shell grid-bg">
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark"><img src="assets/wave-text.svg" width="32" height="32" alt=""></span> MONO.STT
+      </a>
+      <nav class="nav" aria-label="主导航">
+        <a href="index.html#features">产品</a>
+        <a href="pricing.html">开源</a>
+        <a href="changelog.html" class="router-link-active router-link-exact-active" aria-current="page">更新日志</a>
+        <a href="releases.html">历史版本</a>
+        <a href="docs.html">文档</a>
+      </nav>
+      <a href="index.html#download" class="header-download">下载</a>
+      <button class="menu-btn" type="button" aria-label="打开菜单">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+      </button>
+    </div>
+    <div class="mobile-nav wrap">
+      <a href="index.html#features">产品</a>
+      <a href="pricing.html">开源</a>
+      <a href="changelog.html">更新日志</a>
+      <a href="releases.html">历史版本</a>
+      <a href="docs.html">文档</a>
+      <a href="index.html#download">下载</a>
+    </div>
+  </header>
+
+  <main class="subpage wrap">
+    <h1>更新日志</h1>
+    <p class="lead">记录每个公开版本实际交付的能力。需要安装包请到「历史版本」下载。</p>
+    <div class="card-list">
+      <article class="card">
+        <h2>0.1.7 <span> · 2026-11-27</span><span class="hist-latest">最新</span></h2>
+        <ul>
+          <li>移除应用内录音、麦克风选择和相关权限</li>
+          <li>「新建转录」直接进入音视频导入页，支持文件选择和拖放</li>
+          <li>已有转录记录的回听、编辑和导出功能继续可用</li>
+        </ul>
+      </article>
+      <article class="card">
+        <h2>0.1.6 <span> · 2026-11-26</span></h2>
+        <ul>
+          <li>转录片段逐段显示，队列支持取消、重试和重启恢复</li>
+          <li>每个音视频文件可单独配置纠错词和热词</li>
+          <li>转录时间戳限制在实际音轨范围内</li>
+        </ul>
+      </article>
+      <article class="card">
+        <h2>0.1.5 <span> · 2026-11-25</span></h2>
+        <ul>
+          <li>新增 macOS 14+ Apple Silicon 支持，内置 CPU 转录引擎</li>
+          <li>批量导出 SRT、TXT 或全部格式到一个 ZIP，支持搜索、分页与跨页勾选</li>
+          <li>新版 Windows 安装器与卸载确认窗口，卸载时保留记录、设置和模型</li>
+          <li>飞书发布支持删除已关联的云文档</li>
+        </ul>
+      </article>
+      <article class="card">
+        <h2>0.1.4 <span> · 2026-11-25</span></h2>
+        <ul>
+          <li>首个支持应用内更新的版本，0.1.3 用户需下载安装包覆盖安装</li>
+          <li>在「偏好设置 → 通用 → 检查更新」查看当前版本与可用更新</li>
+          <li>改进确认转录页与「更多操作」菜单</li>
+        </ul>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <h2>产品与协议</h2>
+          <a href="index.html">MONO.STT 首页</a>
+          <a href="pricing.html">开源与获取</a>
+          <a href="docs.html">使用文档</a>
+          <a href="https://github.com/Rui333333/MONO.STT/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT 许可证</a>
+          <a href="docs.html#privacy">数据与隐私</a>
+        </div>
+        <div>
+          <h2>资源与支持</h2>
+          <a href="docs.html">使用文档</a>
+          <a href="changelog.html">更新日志</a>
+          <a href="releases.html">历史版本</a>
+          <a href="https://github.com/Rui333333/MONO.STT/issues" target="_blank" rel="noopener noreferrer">问题反馈</a>
+        </div>
+        <div>
+          <h2>联系我们</h2>
+          <p>Rui333333 · 开源维护者</p>
+          <a href="https://github.com/Rui333333/MONO.STT/issues" target="_blank" rel="noopener noreferrer">GitHub Issues</a>
+          <p>转录与回听在本机完成，素材不上传。</p>
+        </div>
+      </div>
+      <p class="copy">© 2026 Rui333333 · MONO.STT · MIT License</p>
+      <!-- 上线部署到国内域名时，请把下面两个链接替换为自己的 ICP / 公安备案信息 -->
+      <p class="beian"><a href="https://github.com/Rui333333/MONO.STT" target="_blank" rel="noopener noreferrer">GitHub 仓库</a><a href="https://github.com/Rui333333/MONO.STT/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">开源许可 · MIT</a></p>
+    </div>
+  </footer>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

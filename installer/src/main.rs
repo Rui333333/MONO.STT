@@ -224,6 +224,11 @@ fn apply(
     }
     package::copy(&mut file, parts.gui, &incoming.join(system::UNINSTALL_UI))
         .map_err(|e| e.to_string())?;
+    fs::write(
+        incoming.join(system::APP_ICON),
+        include_bytes!("../../src-tauri/icons/icon.ico"),
+    )
+    .map_err(|e| e.to_string())?;
     progress("close", None);
     system::close_app(directory)?;
 
@@ -232,6 +237,7 @@ fn apply(
         "runtime",
         system::MAINTENANCE,
         system::UNINSTALL_UI,
+        system::APP_ICON,
     ];
     let mut moved_old = Vec::new();
     let mut moved_new = Vec::new();
@@ -266,6 +272,7 @@ fn apply(
         }
         return Err(error);
     }
+    system::refresh_shell_icons(directory);
     progress("complete", Some(100));
     Ok(())
 }

@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="MONO.STT 是 Windows 与 macOS 上的本地转录工具。导入音频或视频，即可在本机生成带时间戳的逐字稿，支持回听校对、批量导出与飞书云文档。">
+  <title>MONO.STT - 本地音视频转录工具</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="page-shell grid-bg">
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a href="index.html" class="router-link-active router-link-exact-active brand" aria-current="page">
+        <span class="brand-mark"><img src="assets/wave-text.svg" width="32" height="32" alt=""></span> MONO.STT
+      </a>
+      <nav class="nav" aria-label="主导航">
+        <a href="index.html#features" class="router-link-active router-link-exact-active" aria-current="page">产品</a>
+        <a href="pricing.html">开源</a>
+        <a href="changelog.html">更新日志</a>
+        <a href="releases.html">历史版本</a>
+        <a href="docs.html">文档</a>
+      </nav>
+      <a href="index.html#download" class="header-download">下载</a>
+      <button class="menu-btn" type="button" aria-label="打开菜单">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+      </button>
+    </div>
+    <div class="mobile-nav wrap">
+      <a href="index.html#features">产品</a>
+      <a href="pricing.html">开源</a>
+      <a href="changelog.html">更新日志</a>
+      <a href="releases.html">历史版本</a>
+      <a href="docs.html">文档</a>
+      <a href="index.html#download">下载</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero wrap">
+      <h1> 本地音视频转录工具 </h1>
+      <p class="formula"> MONO.STT <span>=</span> Whisper <span>+</span> 时间轴校对 <span>+</span> 批量导出 <span>+</span> 飞书 </p>
+      <p class="hero-lead">全本地、离线可用、数据不出本机，<span>让访谈与会议记录更好整理🚀</span></p>
+      <ul class="platforms">
+        <li class="platform">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <path fill="#00A4EF" d="M6 10.2 21.2 8.1v14.6H6z"></path>
+            <path fill="#7FBA00" d="M23.2 7.8 42 5v17.7H23.2z"></path>
+            <path fill="#F25022" d="M6 26.3h15.2V41L6 38.8z"></path>
+            <path fill="#FFB900" d="M23.2 26.3H42V43.2L23.2 40.8z"></path>
+          </svg> Windows x64
+        </li>
+        <li class="platform">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <rect x="8" y="10" width="32" height="22" rx="3" fill="#111"></rect>
+            <rect x="18" y="32" width="12" height="3" rx="1" fill="#111"></rect>
+            <rect x="14" y="35" width="20" height="3" rx="1.5" fill="#111"></rect>
+          </svg> macOS 14+
+        </li>
+        <li class="platform">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <rect x="13" y="13" width="22" height="22" rx="4" fill="none" stroke="#111" stroke-width="3"></rect>
+            <rect x="20" y="20" width="8" height="8" rx="2" fill="#111"></rect>
+            <path d="M19 6v7M29 6v7M19 35v7M29 35v7M6 19h7M6 29h7M35 19h7M35 29h7" stroke="#111" stroke-width="3" stroke-linecap="round"></path>
+          </svg> 本地运行
+        </li>
+      </ul>
+      <div class="cta-row">
+        <a class="btn btn-dark" href="#download"> ↓ 立即下载 <span class="kbd">D</span></a>
+        <a class="btn btn-light" href="#features"> 查看功能 <span class="kbd">M</span></a>
+      </div>
+    </section>
+
+    <section id="features" class="section wrap">
+      <h2 class="section-title">MONO.STT 导入、校对、导出与分享</h2>
+
+      <article class="feature">
+        <div class="feature-copy">
+          <h3>拖进音视频，逐字稿就出来了</h3>
+          <p> 转录在本机完成，模型也由本机管理。批量导入自动排队，片段逐段显示，不用把素材上传到任何服务。 </p>
+          <ul>
+            <li>内置 Whisper Large v3 Turbo 与 Whisper Large v3</li>
+            <li>Windows 可用 CPU 或 NVIDIA CUDA，macOS 使用 CPU</li>
+            <li>队列支持取消、重试与重启后恢复</li>
+            <li>每个文件可单独配置纠错词与热词</li>
+          </ul>
+        </div>
+        <div>
+          <div class="pills">
+            <button class="pill active" data-agent="import">导入转录</button>
+            <button class="pill" data-agent="review">时间轴校对</button>
+            <button class="pill" data-agent="export">批量导出</button>
+          </div>
+          <div class="mock" aria-label="转录工作流示意">
+            <div class="mock-bar">
+              <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+              <span data-agent-title>导入转录</span>
+            </div>
+            <div class="mock-body" style="grid-template-columns: 1fr;">
+              <div class="mock-main">
+                <span class="chip">本地工作流</span>
+                <p style="margin: 12px 0 0;" data-agent-prompt>访谈录音.m4a · Whisper Large v3 Turbo</p>
+                <div class="sql">
+                  <b># 生成结果</b><br>
+                  <em data-agent-result>00:00:03 今天我们聊聊产品从零到一的过程……</em>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="feature reverse">
+        <div class="feature-copy">
+          <h3>时间轴校对，点一下就回到那一句</h3>
+          <p>逐字稿和时间戳一起保存。点击时间戳跳转回听，可调播放速度、开启滚动跟随，边听边改。</p>
+          <ul>
+            <li>点击时间戳跳转回听，支持调整播放速度</li>
+            <li>滚动跟随与「回到当前朗读行」</li>
+            <li>直接编辑逐字稿文字并保存</li>
+            <li>转录片段逐段显示，长音频不必等全部完成</li>
+          </ul>
+        </div>
+        <div class="mock" aria-label="逐字稿校对示意">
+          <div class="mock-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span> 访谈录音.m4a · 逐字稿 </div>
+          <div class="mock-body">
+            <aside class="mock-side">
+              <div class="side-item">00:00:03</div>
+              <div class="side-item active">00:01:12</div>
+              <div class="side-item">00:02:40</div>
+              <div class="side-item">00:04:05</div>
+            </aside>
+            <div class="mock-main">
+              <div class="sql"><b>逐字稿</b> · 已回听 2 处 · 修改 1 处</div>
+              <table class="table">
+                <thead><tr><th>时间</th><th>内容</th></tr></thead>
+                <tbody>
+                  <tr><td>00:00:03</td><td>今天我们聊聊产品从零到一的过程</td></tr>
+                  <tr><td>00:01:12</td><td>先把素材整理成逐字稿，再做校对</td></tr>
+                  <tr><td>00:02:40</td><td>导出时可以同时带上时间戳</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="feature">
+        <div class="feature-copy">
+          <h3>导出与飞书，交给下一步</h3>
+          <p>单条记录可导出 TXT、Markdown 和 SRT；多条记录可批量打包成 ZIP，也能直接发布到飞书云文档。</p>
+          <ul>
+            <li>单条导出 TXT / Markdown / SRT</li>
+            <li>批量导出支持搜索、分页与跨页勾选</li>
+            <li>TXT、SRT 或两种格式打包进一个 ZIP</li>
+            <li>配置飞书自建应用后可创建、更新、删除关联文档</li>
+          </ul>
+        </div>
+        <div class="mock" aria-label="批量导出示意">
+          <div class="mock-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span> 批量导出 · 转录记录 </div>
+          <div class="mock-body">
+            <aside class="mock-side">
+              <div class="side-item">全部记录</div>
+              <div class="side-item active">已选 12 条</div>
+              <div class="side-item">TXT + SRT</div>
+              <div class="side-item">ZIP 打包</div>
+            </aside>
+            <div class="mock-main">
+              <p><strong>MONO.STT_导出_20261127.zip</strong> · 12 个文件</p>
+              <table class="table">
+                <thead><tr><th>文件</th><th>格式</th></tr></thead>
+                <tbody>
+                  <tr><td>访谈录音.m4a.txt</td><td>TXT</td></tr>
+                  <tr><td>访谈录音.m4a.srt</td><td>SRT</td></tr>
+                  <tr><td>周会记录.mp3.txt</td><td>TXT</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="feature reverse">
+        <div class="feature-copy">
+          <h3>数据留在你自己的设备上</h3>
+          <p>转录记录、回听音轨和模型都放在本机目录。只有下载模型、检查更新和主动发布到飞书时才需要网络。</p>
+          <ul>
+            <li>Windows：安装目录下的 data/ 与 models/</li>
+            <li>macOS：~/Library/Application Support/MONO.STT/</li>
+            <li>记录保存在 data/mono.db，音轨在 data/audio/</li>
+            <li>删除记录会清理配套音频，导入原件保持原位</li>
+          </ul>
+        </div>
+        <div class="mock" aria-label="本地数据目录示意">
+          <div class="mock-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span> MONO.STT · 数据目录 </div>
+          <div class="term">
+            <div>MONO.STT/</div>
+            <div>├─ data/</div>
+            <div>│&nbsp; ├─ <span class="cmd">mono.db</span>&nbsp;&nbsp;&nbsp; 转录记录与设置</div>
+            <div>│&nbsp; └─ <span class="cmd">audio/</span>&nbsp;&nbsp;&nbsp;&nbsp; 回听音轨</div>
+            <div>├─ <span class="cmd">models/</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 模型权重（可改目录）</div>
+            <div>└─ <span class="ok">离线转录 ✓</span>&nbsp; 素材不上传</div>
+            <div>&nbsp;</div>
+            <div>联网仅限：下载模型 / 检查更新 / 发布飞书</div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="section">
+      <div class="wrap"><h2 class="section-title">支持的格式与能力</h2></div>
+      <div class="marquee-wrap">
+        <div class="marquee">
+          <div class="proto">音频</div><div class="proto">视频</div><div class="proto">批量导入</div><div class="proto">逐字稿</div><div class="proto">时间戳</div><div class="proto">TXT</div><div class="proto">Markdown</div><div class="proto">SRT</div><div class="proto">ZIP</div><div class="proto">飞书云文档</div><div class="proto">Whisper v3 Turbo</div><div class="proto">Whisper v3</div><div class="proto">CPU</div><div class="proto">NVIDIA CUDA</div>
+          <div class="proto">音频</div><div class="proto">视频</div><div class="proto">批量导入</div><div class="proto">逐字稿</div><div class="proto">时间戳</div><div class="proto">TXT</div><div class="proto">Markdown</div><div class="proto">SRT</div><div class="proto">ZIP</div><div class="proto">飞书云文档</div><div class="proto">Whisper v3 Turbo</div><div class="proto">Whisper v3</div><div class="proto">CPU</div><div class="proto">NVIDIA CUDA</div>
+        </div>
+        <div class="marquee alt">
+          <div class="proto">NVIDIA CUDA</div><div class="proto">CPU</div><div class="proto">Whisper v3</div><div class="proto">Whisper v3 Turbo</div><div class="proto">飞书云文档</div><div class="proto">ZIP</div><div class="proto">SRT</div><div class="proto">Markdown</div><div class="proto">TXT</div><div class="proto">时间戳</div><div class="proto">逐字稿</div><div class="proto">批量导入</div><div class="proto">视频</div><div class="proto">音频</div>
+          <div class="proto">音频</div><div class="proto">视频</div><div class="proto">批量导入</div><div class="proto">逐字稿</div><div class="proto">时间戳</div><div class="proto">TXT</div><div class="proto">Markdown</div><div class="proto">SRT</div><div class="proto">ZIP</div><div class="proto">飞书云文档</div><div class="proto">Whisper v3 Turbo</div><div class="proto">Whisper v3</div><div class="proto">CPU</div><div class="proto">NVIDIA CUDA</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="download" class="section wrap">
+      <h2 class="section-title">下载客户端</h2>
+      <div class="download-grid">
+        <article class="dl-card" data-card="mac">
+          <h3>Mac</h3>
+          <p>macOS 14+ · Apple Silicon</p>
+          <p class="dl-meta"><span data-dl-meta>v0.1.7 · DMG · 108.2 MB</span><span class="dl-tag">最新版</span></p>
+          <div class="os-tabs">
+            <button class="active" data-os="latest">最新 0.1.7</button>
+            <button data-os="prev">上一版 0.1.6</button>
+          </div>
+          <a class="dl-btn" data-dl-btn href="https://github.com/Rui333333/MONO.STT/releases/download/v0.1.7/MONO.STT_0.1.7_arm64.dmg">下载 DMG 安装包</a>
+        </article>
+        <article class="dl-card current" data-card="windows">
+          <p class="current-badge">当前系统</p>
+          <h3>Windows</h3>
+          <p>Windows 10 / 11 · x64</p>
+          <p class="dl-meta"><span data-dl-meta>v0.1.7 · EXE 安装版 · 139.5 MB</span><span class="dl-tag">最新版</span></p>
+          <div class="os-tabs">
+            <button class="active" data-os="latest">最新 0.1.7</button>
+            <button data-os="prev">上一版 0.1.6</button>
+          </div>
+          <a class="dl-btn" data-dl-btn href="https://github.com/Rui333333/MONO.STT/releases/download/v0.1.7/MONO.STT_0.1.7_x64-setup.exe">下载 EXE 安装版</a>
+        </article>
+        <article class="dl-card" data-card="source">
+          <h3>源码构建</h3>
+          <p>MIT 开源 · 自行打包</p>
+          <p class="dl-meta"><span data-dl-meta>Rust + Python · Windows / macOS</span><span class="dl-tag">开源</span></p>
+          <div class="os-tabs">
+            <button class="active" data-os="readme">构建说明</button>
+            <button data-os="release">Releases</button>
+          </div>
+          <a class="dl-btn" data-dl-btn href="https://github.com/Rui333333/MONO.STT#从源码构建">查看构建说明</a>
+        </article>
+      </div>
+      <p class="hist-more"> 需要旧版本？前往 <a href="releases.html">历史版本</a> 下载，或到 <a href="https://github.com/Rui333333/MONO.STT/releases" target="_blank" rel="noopener noreferrer">GitHub Releases</a> 查看全部。 </p>
+    </section>
+
+    <section class="section wrap">
+      <div class="faq-head">
+        <h2 class="section-title" style="margin-bottom: 8px;">常见问题</h2>
+        <p>关于 MONO.STT，你想知道的都在这里。</p>
+      </div>
+      <div class="faq">
+        <div class="faq-item">
+          <button type="button" aria-expanded="true">MONO.STT 是免费的吗？ <span>−</span></button>
+          <div class="body">是。项目采用 MIT 许可证开源，桌面客户端可免费下载和使用，没有账号、订阅或功能限制。</div>
+        </div>
+        <div class="faq-item">
+          <button type="button" aria-expanded="false">音频和逐字稿会上传到云端吗？ <span>+</span></button>
+          <div class="body" hidden>不会。语音识别和回听都在本机运行，转录记录保存在 data/mono.db。只有下载模型、检查更新，以及你主动发布到飞书云文档时才会联网。</div>
+        </div>
+        <div class="faq-item">
+          <button type="button" aria-expanded="false">支持哪些系统和设备？ <span>+</span></button>
+          <div class="body" hidden>Windows x64（CPU 或兼容的 NVIDIA CUDA），以及 macOS 14 及以上的 Apple Silicon（CPU）。当前没有 Intel Mac 与 Linux 的官方安装包。</div>
+        </div>
+        <div class="faq-item">
+          <button type="button" aria-expanded="false">需要自己准备模型吗？ <span>+</span></button>
+          <div class="body" hidden>不需要。安装包内置转录引擎，首次启动按引导下载模型，或直接选择本机已有的模型目录；提供 Whisper Large v3 Turbo 与 Whisper Large v3，并用内置普通话音频试转录。</div>
+        </div>
+        <div class="faq-item">
+          <button type="button" aria-expanded="false">遇到问题如何反馈？ <span>+</span></button>
+          <div class="body" hidden>请到 GitHub Issues 提交，附上版本号（当前 0.1.7）、操作系统和复现步骤，并注意隐藏密码、API Key 与内网地址。</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <h2>产品与协议</h2>
+          <a href="index.html">MONO.STT 首页</a>
+          <a href="pricing.html">开源与获取</a>
+          <a href="docs.html">使用文档</a>
+          <a href="https://github.com/Rui333333/MONO.STT/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT 许可证</a>
+          <a href="docs.html#privacy">数据与隐私</a>
+        </div>
+        <div>
+          <h2>资源与支持</h2>
+          <a href="docs.html">使用文档</a>
+          <a href="changelog.html">更新日志</a>
+          <a href="releases.html">历史版本</a>
+          <a href="https://github.com/Rui333333/MONO.STT/issues" target="_blank" rel="noopener noreferrer">问题反馈</a>
+        </div>
+        <div>
+          <h2>联系我们</h2>
+          <p>Rui333333 · 开源维护者</p>
+          <a href="https://github.com/Rui333333/MONO.STT/issues" target="_blank" rel="noopener noreferrer">GitHub Issues</a>
+          <p>转录与回听在本机完成，素材不上传。</p>
+        </div>
+      </div>
+      <p class="copy">© 2026 Rui333333 · MONO.STT · MIT License</p>
+      <!-- 上线部署到国内域名时，请把下面两个链接替换为自己的 ICP / 公安备案信息 -->
+      <p class="beian"><a href="https://github.com/Rui333333/MONO.STT" target="_blank" rel="noopener noreferrer">GitHub 仓库</a><a href="https://github.com/Rui333333/MONO.STT/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">开源许可 · MIT</a></p>
+    </div>
+  </footer>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

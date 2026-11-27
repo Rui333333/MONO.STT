@@ -1,0 +1,16 @@
+{
+  "_usage": "MONO.STT 官网基础信息。把 pairs 里某项的 to 改成新内容后运行 npm run rebrand，可一次性替换全站文案；发布新版时同步 latestVersion 与页面上的下载链接。",
+  "brand": "MONO.STT",
+  "author": "Rui333333",
+  "repo": "https://github.com/Rui333333/MONO.STT",
+  "latestVersion": "0.1.7",
+  "license": "MIT License",
+  "_todo": "部署到国内域名时，把页脚 .beian 里的两个链接换成自己的 ICP 备案号和公安备案号；如有公司主体和联系邮箱，也一并替换。",
+  "pairs": [
+    { "label": "品牌名", "from": "MONO.STT", "to": "MONO.STT" },
+    { "label": "作者 / 维护者", "from": "Rui333333", "to": "Rui333333" },
+    { "label": "仓库地址", "from": "https://github.com/Rui333333/MONO.STT", "to": "https://github.com/Rui333333/MONO.STT" },
+    { "label": "当前版本号", "from": "0.1.7", "to": "0.1.7" },
+    { "label": "许可证", "from": "MIT License", "to": "MIT License" }
+  ]
+}

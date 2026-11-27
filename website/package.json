@@ -1,0 +1,11 @@
+{
+  "name": "mono-stt-website",
+  "version": "0.1.7",
+  "private": true,
+  "description": "MONO.STT 官网（纯静态，无构建依赖）",
+  "scripts": {
+    "dev": "node serve.mjs",
+    "rebrand": "node rebrand.mjs",
+    "build:single": "node build-single.mjs"
+  }
+}

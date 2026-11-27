@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWxsZWRieT0idGl0bGUgZGVzYyI+CiAgPHRpdGxlIGlkPSJ0aXRsZSI+TU9OTy5TVFQgZmF2aWNvbjwvdGl0bGU+CiAgPGRlc2MgaWQ9ImRlc2MiPjE2cHgg5LiT55So566A5YyW56ym5Y+377ya5LiJ5qC55aOw5rOi56uW5p2h5Yqg5LiA5Liq5L+h5Y+354K577yM5Zyo5p6B5bCP5bC65a+45LiL5LuN5Y+v6L6o6K6k44CCPC9kZXNjPgogIDxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0IiBmaWxsPSIjMDkwOTBCIi8+CiAgPGcgZmlsbD0iI0ZGRkZGRiI+CiAgICA8cmVjdCB4PSIxMiIgeT0iMjQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iNCIvPgogICAgPHJlY3QgeD0iMjQiIHk9IjE2IiB3aWR0aD0iOCIgaGVpZ2h0PSIzMiIgcng9IjQiLz4KICAgIDxyZWN0IHg9IjM2IiB5PSIyMSIgd2lkdGg9IjgiIGhlaWdodD0iMjIiIHJ4PSI0Ii8+CiAgPC9nPgogIDxjaXJjbGUgY2xhc3M9InNpZ25hbC1kb3QiIGN4PSI1MCIgY3k9IjM4IiByPSI0IiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPgo=">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="MONO.STT 是 Windows 与 macOS 上的本地转录工具。导入音频或视频，即可在本机生成带时间戳的逐字稿，支持回听校对、批量导出与飞书云文档。">
+  <title>MONO.STT - 本地音视频转录工具</title>
+  <style>
+:root{--ink: #111318;--muted: #5b6170;--faint: #8b91a0;--line: rgba(17, 19, 24, .08);--paper: #f7f8fb;--white: #ffffff;--accent: #3b5bfd;--accent-soft: #eef1ff;--radius: 16px;--shadow: 0 18px 50px rgba(17, 19, 24, .08);--font: "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif}
+*,*:before,*:after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);color:var(--ink);background:var(--paper);line-height:1.6;min-height:100vh}
+a{color:inherit;text-decoration:none}
+button,input{font:inherit}
+img{max-width:100%}
+.grid-bg{background-color:var(--paper);background-image:linear-gradient(to right,rgba(17,19,24,.045) 1px,transparent 1px),linear-gradient(to bottom,rgba(17,19,24,.045) 1px,transparent 1px);background-size:44px 44px}
+.wrap{width:min(1120px,calc(100% - 40px));margin:0 auto}
+.page-shell{min-height:100vh}
+.site-header{position:sticky;top:0;z-index:40;background:#ffffffeb;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
+.header-inner{display:flex;align-items:center;justify-content:space-between;height:68px;gap:24px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px;letter-spacing:-.04em}
+.brand-mark{width:32px;height:32px;border-radius:9px;background:#111;color:#fff;display:grid;place-items:center}
+.nav{display:flex;align-items:center;gap:22px;color:var(--muted);font-weight:600}
+.nav a:hover,.nav a.router-link-active{color:var(--ink)}
+.header-download{display:inline-flex;align-items:center;height:38px;padding:0 16px;border-radius:999px;background:var(--ink);color:#fff;font-weight:600;font-size:14px}
+.menu-btn{display:none;width:40px;height:40px;border:0;background:transparent;cursor:pointer}
+.hero{padding:88px 0 72px;text-align:center}
+.hero h1{font-size:clamp(40px,6vw,72px);line-height:1.12;letter-spacing:-.05em;font-weight:800}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.hero h1 span{color:var(--faint);font-weight:700}
+.hero-lead{margin:18px auto 0;max-width:720px;color:var(--muted);font-size:clamp(16px,2vw,18px);line-height:1.7;font-weight:600}
+.hero-lead span{white-space:nowrap}
+.formula{margin-top:28px;font-size:clamp(22px,3vw,34px);font-weight:800;letter-spacing:-.04em}
+.formula span{color:var(--faint);font-weight:700}
+.platforms{margin:48px auto 0;display:flex;justify-content:center;gap:36px;flex-wrap:wrap}
+.platform{display:flex;flex-direction:column;align-items:center;gap:10px;color:var(--muted);font-weight:600;min-width:84px}
+.platform svg{width:42px;height:42px}
+.cta-row{margin-top:48px;display:flex;flex-direction:column;align-items:center;gap:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-width:280px;height:56px;padding:0 22px;border-radius:999px;font-weight:700;border:1px solid transparent;cursor:pointer}
+.btn-dark{background:#1d1f24;color:#fff}
+.btn-light{background:#fff;border-color:var(--line);color:var(--ink);box-shadow:0 8px 24px #1113180a}
+.kbd{margin-left:8px;min-width:28px;height:28px;padding:0 8px;border-radius:8px;background:#ffffff29;display:inline-grid;place-items:center;font-size:13px}
+.btn-light .kbd{background:#f1f2f6}
+.section{padding:88px 0}
+.section-title{text-align:center;font-size:clamp(28px,4vw,44px);letter-spacing:-.04em;margin-bottom:56px}
+.feature{display:grid;grid-template-columns:.92fr 1.08fr;gap:48px;align-items:center;margin-bottom:88px}
+.feature.reverse{grid-template-columns:1.08fr .92fr}
+.feature.reverse .feature-copy{order:2}
+.feature h3{font-size:32px;letter-spacing:-.04em;margin-bottom:14px}
+.feature p{color:var(--muted);margin-bottom:18px}
+.feature ul{list-style:none;display:grid;gap:10px;color:#2d3340}
+.feature li{padding-left:18px;position:relative}
+.feature li:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent);position:absolute;left:0;top:10px}
+.pills{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.pill{border:0;height:36px;padding:0 14px;border-radius:999px;background:#fff;color:var(--muted);font-weight:600;cursor:pointer;box-shadow:inset 0 0 0 1px var(--line)}
+.pill.active{background:var(--ink);color:#fff;box-shadow:none}
+.mock{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden;min-height:340px}
+.mock-bar{height:42px;display:flex;align-items:center;gap:8px;padding:0 14px;border-bottom:1px solid var(--line);color:var(--faint);font-size:13px}
+.dot{width:10px;height:10px;border-radius:50%;background:#e4e6ec}
+.dot.r{background:#ff6b6b}
+.dot.y{background:#ffd166}
+.dot.g{background:#06d6a0}
+.mock-body{display:grid;grid-template-columns:180px 1fr;min-height:298px}
+.mock-side{border-right:1px solid var(--line);padding:14px;background:#fbfbfd;font-size:13px}
+.mock-main{padding:16px;font-size:13px}
+.side-item,.row{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:8px}
+.side-item.active,.row:nth-child(2){background:var(--accent-soft)}
+.chip{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:700}
+.sql{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#111318;color:#d7dce8;border-radius:10px;padding:12px;margin-top:12px;line-height:1.7}
+.sql b{color:#8fb3ff;font-weight:700}
+.sql em{color:#9ee7c7;font-style:normal}
+.table{margin-top:12px;width:100%;border-collapse:collapse}
+.table th,.table td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
+.term{background:#111318;color:#d8deea;min-height:256px;padding:16px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;line-height:1.7}
+.term .ok{color:#9ee7c7}
+.term .cmd{color:#8fb3ff}
+.marquee-wrap{overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
+.marquee{display:flex;gap:16px;width:max-content;animation:slide 28s linear infinite}
+.marquee.alt{margin-top:16px;animation-direction:reverse}
+.proto{min-width:168px;height:72px;background:#fff;border:1px solid var(--line);border-radius:14px;display:flex;align-items:center;justify-content:center;gap:10px;font-weight:700;padding:0 18px}
+@keyframes slide{0%{transform:translate(0)}
+to{transform:translate(-50%)}
+}
+.download-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.dl-card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:24px;box-shadow:var(--shadow)}
+.dl-card.current{outline:2px solid var(--ink)}
+.dl-card h3{font-size:28px;margin:8px 0 4px}
+.dl-card p,.dl-meta{color:var(--muted);font-size:14px}
+.dl-force{display:inline-flex;margin-left:8px;padding:1px 8px;border-radius:999px;background:#fee2e2;color:#b91c1c;font-size:12px;font-weight:700;vertical-align:middle}
+.os-tabs{display:flex;gap:8px;margin:18px 0}
+.os-tabs button{border:0;background:#f3f4f8;height:34px;padding:0 12px;border-radius:999px;cursor:pointer;font-weight:600;color:var(--muted)}
+.os-tabs button.active{background:var(--ink);color:#fff}
+.dl-btn,.dl-btn-disabled{display:flex;align-items:center;justify-content:center;height:44px;border-radius:999px;font-weight:700}
+.dl-btn{background:var(--ink);color:#fff}
+.dl-btn-disabled{background:#eef0f5;color:var(--faint)}
+.hist-more{margin:20px 0 0;text-align:center;color:var(--muted);font-size:14px}
+.hist-more a{font-weight:700;color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.faq-head{text-align:center;margin-bottom:28px}
+.faq-head p{color:var(--muted)}
+.faq{background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.faq-item+.faq-item{border-top:1px solid var(--line)}
+.faq-item button{width:100%;text-align:left;background:transparent;border:0;padding:18px 22px;font-weight:700;cursor:pointer;display:flex;justify-content:space-between;gap:16px}
+.faq-item .body{padding:0 22px 18px;color:var(--muted)}
+.site-footer{background:#fff;border-top:1px solid var(--line);padding:56px 0 28px}
+.footer-grid{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:32px}
+.site-footer h2{font-size:16px;margin-bottom:14px}
+.site-footer a,.site-footer p{display:block;color:var(--muted);margin-bottom:8px}
+.copy{margin-top:36px;color:var(--faint);font-size:13px}
+.beian{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px 16px}
+.site-footer .beian a{display:inline;margin:0;color:var(--faint);font-size:13px;white-space:nowrap}
+.subpage{padding:72px 0 96px}
+.subpage h1{font-size:42px;letter-spacing:-.04em;margin-bottom:12px}
+.lead{color:var(--muted);margin-bottom:32px;max-width:640px}
+.card-list{display:grid;gap:16px}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px;scroll-margin-top:88px}
+.card h2{margin-bottom:8px}
+.card h3{margin:16px 0 8px;font-size:15px;font-weight:700}
+.card p{color:var(--muted);line-height:1.7}
+.card p+p,.card ul+p{margin-top:10px}
+.card ul{margin-top:12px;padding-left:18px;color:var(--muted);line-height:1.7}
+.card li+li{margin-top:6px}
+.card code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;padding:1px 6px;border-radius:6px;background:#0000000d}
+.hist-empty{color:var(--muted);padding:24px 0}
+.hist-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.hist-head time{font-size:13px;color:var(--faint, #8b91a0)}
+.hist-latest,.hist-force{display:inline-flex;align-items:center;margin-left:8px;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;vertical-align:middle}
+.hist-latest{background:#111;color:#fff}
+.hist-force{background:#fff1f0;color:#d03050}
+.hist-notes{margin-top:10px}
+.hist-muted{margin-top:8px}
+.hist-files{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.hist-file{display:inline-flex;align-items:center;gap:10px;padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink);font-size:13px}
+.hist-file:hover{border-color:#111}
+.hist-file span{color:var(--muted);font-size:12px}
+.doc-qr{margin:18px 0 0;display:grid;justify-items:start;gap:10px}
+.doc-qr img{width:220px;height:220px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px}
+.doc-qr figcaption{font-size:13px;color:var(--muted)}
+.pricing-head{text-align:center;margin-bottom:36px}
+.pricing-head h1{font-size:clamp(36px,5vw,52px);letter-spacing:-.04em;margin:8px 0 18px}
+.pricing-head h2{font-size:28px;letter-spacing:-.03em}
+.pricing-head .lead{margin:10px auto 0;text-align:center}
+.pricing-kicker{color:var(--faint);font-size:12px;font-weight:700;letter-spacing:.16em}
+.price-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;align-items:stretch}
+.price{background:#fff;border:1px solid var(--line);border-radius:20px;padding:28px;box-shadow:var(--shadow);display:flex;flex-direction:column}
+.price.featured{border:2px solid var(--ink)}
+.price .tier{color:var(--faint);font-size:13px;font-weight:700;letter-spacing:.04em}
+.price .badge{align-self:flex-start;margin-bottom:12px;background:var(--ink);color:#fff;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:700}
+.price h3{font-size:28px;margin:6px 0 14px}
+.bill-toggle{display:inline-flex;gap:6px;padding:4px;border-radius:999px;background:#f3f4f8;margin-bottom:14px}
+.bill-toggle button{border:0;background:transparent;height:32px;padding:0 14px;border-radius:999px;cursor:pointer;font-weight:700;color:var(--muted)}
+.bill-toggle button.active{background:var(--ink);color:#fff}
+.price .num{font-size:48px;font-weight:800;letter-spacing:-.04em;line-height:1}
+.price .num span{font-size:22px;margin-right:2px}
+.price .period{margin-top:8px;color:var(--muted);font-weight:600}
+.price .blurb{margin:16px 0;color:var(--muted);line-height:1.6}
+.price ul{list-style:none;display:grid;gap:10px;margin-bottom:22px}
+.price li{position:relative;padding-left:18px;line-height:1.5}
+.price li:before{content:"";position:absolute;left:0;top:.55em;width:7px;height:7px;border-radius:50%;background:var(--accent)}
+.price .dl-btn{margin-top:auto}
+.pricing-team{margin-top:56px;background:#fff;border:1px solid var(--line);border-radius:20px;padding:36px;box-shadow:var(--shadow)}
+.pricing-team h2{margin:8px 0 10px;font-size:28px}
+.pricing-team p{color:var(--muted);max-width:640px}
+.pricing-team a{display:inline-block;margin-top:18px;font-weight:700}
+.pricing-faq{margin-top:64px}
+.doc-nav{display:grid;grid-template-columns:220px 1fr;gap:28px}
+.doc-nav aside{position:sticky;top:88px;align-self:start}
+.doc-nav aside a{display:block;padding:8px 0;color:var(--muted);font-weight:600}
+.doc-nav aside a:hover{color:var(--ink)}
+.mobile-nav{display:none;flex-direction:column;gap:12px;padding:0 20px 18px}
+@media (max-width: 900px){.nav,.header-download{display:none}
+.menu-btn{display:grid;place-items:center}
+.mobile-nav.open{display:flex}
+.feature,.feature.reverse,.download-grid,.footer-grid,.price-grid,.doc-nav,.mock-body{grid-template-columns:1fr}
+.doc-nav aside{position:static}
+.feature.reverse .feature-copy{order:0}
+.hero{padding-top:56px}
+}
+.admin-root{min-height:100vh;background:#f4f5f8}
+.adm-shell{min-height:100vh;display:grid;grid-template-columns:220px 1fr}
+.adm-side{background:#fff;border-right:1px solid var(--line);padding:20px 14px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.adm-brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.03em;margin-bottom:22px;padding:0 8px}
+.adm-side nav{display:grid;gap:2px}
+.adm-ico{width:18px;height:18px;flex:none}
+.adm-side nav a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;color:var(--muted);font-weight:650}
+.adm-side nav a:hover{background:#f4f5f8;color:var(--ink)}
+.adm-side nav a.on{background:var(--accent-soft);color:var(--accent)}
+.adm-logout{margin-top:auto;display:flex;align-items:center;justify-content:center;gap:8px;border:0;background:#f4f5f8;height:40px;border-radius:10px;font-weight:700;color:var(--muted);cursor:pointer}
+.adm-logout:hover{color:var(--ink)}
+.adm-main{min-width:0}
+.adm-top{height:60px;display:flex;align-items:center;gap:12px;padding:0 28px;background:#ffffffeb;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
+.adm-top strong{font-size:16px}
+.adm-top span{margin-left:auto;color:var(--muted);font-size:13px;font-weight:650}
+.adm-menu{display:none}
+.adm-content{padding:24px 28px 40px}
+.adm-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px}
+.adm-stats.dense{grid-template-columns:repeat(6,minmax(0,1fr))}
+.adm-stats article,.adm-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px 20px}
+.adm-stats article{position:relative;padding-right:58px}
+.adm-stat-ico{position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:10px;display:grid;place-items:center}
+.adm-stat-ico .adm-ico{width:18px;height:18px}
+.adm-stat-ico.users{background:#eef1ff;color:var(--accent)}
+.adm-stat-ico.connections{background:#eaf8f1;color:#1f8a5b}
+.adm-stat-ico.ads{background:#fff3e6;color:#d97706}
+.adm-stat-ico.visits{background:#f1eefe;color:#6d4dff}
+.adm-stat-ico.clicks{background:#ffeef2;color:#d9486e}
+.adm-stat-ico.visitors{background:#e8f4ff;color:#2b7bb9}
+.adm-stats article>span:not(.adm-stat-ico),.adm-card h2{color:var(--muted);font-size:12px;font-weight:700;letter-spacing:.02em}
+.adm-stats strong{display:block;margin:8px 0 2px;font-size:30px;letter-spacing:-.05em;line-height:1.1}
+.adm-stats small,.adm-table small{color:var(--faint)}
+.adm-grid{display:grid;grid-template-columns:1.25fr .75fr;gap:12px;margin:12px 0}
+.adm-grid.visits{grid-template-columns:minmax(240px,.78fr) minmax(0,1.22fr);align-items:start}
+.adm-grid.visits-charts{grid-template-columns:1.15fr .85fr;align-items:stretch}
+.adm-chart-empty{height:220px;display:grid;place-items:center;color:var(--faint)}
+.adm-vbars{height:240px;display:flex;align-items:flex-end;gap:16px;margin-top:18px;padding:0 8px 8px}
+.adm-vbar{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px}
+.adm-vbar i{display:block;width:100%;max-width:42px;border-radius:8px 8px 4px 4px}
+.adm-vbar b{font-size:12px;color:var(--ink)}
+.adm-vbar span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:12px;font-weight:700}
+.adm-donut{display:grid;grid-template-columns:176px minmax(0,1fr);gap:18px;align-items:center;margin-top:12px}
+.adm-donut svg{width:176px;height:176px}
+.adm-donut-total{font-size:22px;font-weight:800;fill:#111318}
+.adm-donut-sub{font-size:11px;fill:#8b93a7}
+.adm-donut ul{list-style:none;display:grid;gap:8px;max-height:220px;overflow:auto}
+.adm-donut li{display:flex;align-items:center;gap:8px;font-size:13px}
+.adm-donut i{width:10px;height:10px;border-radius:3px;flex:none}
+.adm-donut span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.adm-donut b{font-variant-numeric:tabular-nums}
+.visit-filters{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:14px 0 12px}
+.visit-filters span{color:var(--muted);font-size:13px;flex:none;line-height:42px}
+.visit-range{display:flex;align-items:center;gap:8px;min-width:0}
+.visit-filters select,.visit-filters input[type=date]{height:42px;border:1px solid #e4e6ee;border-radius:12px;padding:0 12px;background:#fff;color:var(--ink);font:inherit;font-size:13px;line-height:42px;outline:none;box-shadow:none;overflow:hidden}
+.visit-filters select:focus,.visit-filters input[type=date]:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.visit-filters select{width:auto;min-width:132px;padding-right:32px;-moz-appearance:none;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%235b6170' d='M1.2 1.4 6 6.2l4.8-4.8'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.visit-filters input[type=date]{width:198px;min-width:198px;flex:none}
+.visit-filters input[type=date]::-webkit-datetime-edit{display:inline-flex;align-items:center;height:42px;padding:0;overflow:hidden}
+.visit-filters input[type=date]::-webkit-datetime-edit-fields-wrapper{display:inline-flex;flex-wrap:nowrap;align-items:center;height:42px}
+.visit-filters input[type=date]::-webkit-datetime-edit-text,.visit-filters input[type=date]::-webkit-datetime-edit-year-field,.visit-filters input[type=date]::-webkit-datetime-edit-month-field,.visit-filters input[type=date]::-webkit-datetime-edit-day-field{padding:0 2px;line-height:42px}
+.visit-filters input[type=date]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:.55}
+.visit-filters .adm-btn{flex:none}
+.adm-card h2.gap{margin-top:22px}
+.adm-bars{height:180px;display:flex;align-items:flex-end;gap:12px;margin-top:18px}
+.adm-bars div{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--muted);font-size:12px}
+.adm-bars i{display:block;width:100%;max-width:28px;border-radius:8px 8px 4px 4px;background:linear-gradient(180deg,#6d86ff,var(--accent))}
+.adm-split,.adm-rank{list-style:none;display:grid;gap:10px;margin-top:14px}
+.adm-split li,.adm-rank li>div{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.adm-rank li{display:grid;gap:6px}
+.adm-rank i{display:block;height:6px;border-radius:999px;background:var(--accent)}
+.adm-rank .empty{color:var(--faint)}
+.adm-toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px}
+.adm-toolbar p{color:var(--muted);font-size:13px;font-weight:650}
+.adm-field,.adm-toolbar input,.adm-toolbar select,.adm-dialog input:not([type=file]):not([type=hidden]):not([type=checkbox]),.adm-dialog select,.adm-dialog textarea,.adm-login input:not(.adm-honeypot){width:min(320px,100%);height:42px;border:1px solid #e4e6ee;border-radius:12px;padding:0 12px;background:#fff;color:var(--ink);font:inherit;outline:none;box-shadow:none;-moz-appearance:none;appearance:none;-webkit-appearance:none}
+.adm-dialog textarea{height:auto;padding:10px 12px;resize:vertical}
+.adm-toolbar input:focus,.adm-toolbar select:focus,.adm-dialog input:focus,.adm-dialog select:focus,.adm-dialog textarea:focus,.adm-login input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.adm-toolbar input:-webkit-autofill,.adm-toolbar input:-webkit-autofill:hover,.adm-toolbar input:-webkit-autofill:focus,.adm-dialog input:-webkit-autofill,.adm-dialog input:-webkit-autofill:hover,.adm-dialog input:-webkit-autofill:focus,.adm-login input:-webkit-autofill,.adm-login input:-webkit-autofill:hover,.adm-login input:-webkit-autofill:focus{-webkit-text-fill-color:var(--ink);caret-color:var(--ink);box-shadow:0 0 0 1000px #fff inset;transition:background-color 99999s ease-out}
+.adm-btn{height:42px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:#fff;font-weight:700;cursor:pointer}
+.adm-btn.dark{background:var(--ink);color:#fff;border-color:var(--ink)}
+.adm-btn.block{width:100%}
+.adm-btn:disabled{opacity:.6;cursor:default}
+.adm-table{width:100%;border-collapse:collapse;margin-top:8px}
+.adm-table th,.adm-table td{text-align:left;padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+.adm-table.compact th,.adm-table.compact td{padding:10px 8px;font-size:13px}
+.adm-table th{color:var(--faint);font-size:12px;font-weight:700}
+.adm-table tbody tr:hover{background:#fafbff}
+.adm-pager{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px;color:var(--muted);font-size:13px}
+.adm-pager div{display:flex;gap:8px}
+.adm-pager .adm-btn:disabled{opacity:.45;pointer-events:none}
+.adm-table small{display:block;margin-top:2px}
+.nowrap{white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--muted)}
+.adm-actions{white-space:nowrap}
+.adm-actions button,.adm-icon-btn{border:0;background:transparent;color:var(--accent);font-weight:700;cursor:pointer;margin-right:8px}
+.adm-tag{display:inline-flex;padding:2px 8px;border-radius:999px;background:#f3f4f8;font-size:12px;font-weight:700}
+.adm-tag.admin,.adm-tag.on{background:var(--accent-soft);color:var(--accent)}
+.adm-tag.warn{background:#fee2e2;color:#b91c1c}
+.adm-switch{display:flex!important;flex-direction:row;align-items:center;gap:10px;color:var(--ink)}
+.adm-switch input{width:18px!important;height:18px!important;min-width:18px;padding:0;accent-color:var(--accent)}
+.adm-empty{color:var(--faint);text-align:center}
+.adm-error{color:#c24141;font-weight:650;margin:8px 0;font-size:13px}
+.adm-mask{position:fixed;top:0;right:0;bottom:0;left:0;background:#11131859;display:grid;place-items:center;padding:20px;z-index:30}
+.adm-dialog{width:min(560px,100%);max-height:min(88vh,820px);display:flex;flex-direction:column;background:#fff;border-radius:18px;padding:18px;overflow:hidden}
+.adm-dialog header,.adm-dialog footer{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-shrink:0}
+.adm-dialog-body{display:grid;gap:12px;margin:16px 0;min-height:0;overflow:auto;padding-right:4px}
+.adm-dialog label,.adm-login label{display:grid;gap:8px;font-size:13px;font-weight:700;color:var(--muted)}
+.adm-dialog input:not([type=file]):not([type=hidden]):not([type=checkbox]),.adm-dialog select,.adm-dialog textarea,.adm-login input:not(.adm-honeypot){width:100%;font-weight:500;color:var(--ink)}
+.adm-two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.adm-honeypot{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+.adm-login{min-height:100vh;display:grid;place-items:center;padding:24px}
+.adm-login-card{position:relative;width:min(400px,100%);background:#fff;border:1px solid var(--line);border-radius:22px;padding:32px 28px;box-shadow:0 24px 70px #11131814}
+.adm-login-card h1{font-size:26px;letter-spacing:-.04em;margin:4px 0 6px}
+.adm-login-card>p{color:var(--muted);margin-bottom:22px}
+.adm-login-card label{margin-bottom:14px}
+.adm-pills{display:flex;gap:4px;padding:4px;background:#eceef3;border-radius:999px;overflow-x:auto}
+.adm-pills button{border:0;height:32px;padding:0 14px;border-radius:999px;background:transparent;font-weight:700;color:var(--muted);cursor:pointer;white-space:nowrap}
+.adm-pills button.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px #11131814}
+.conn-list{display:grid;gap:10px}
+.conn-item{display:grid;grid-template-columns:72px minmax(0,1.6fr) 88px 88px 92px auto;align-items:center;gap:12px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.conn-item:hover{border-color:#d9deea}
+.conn-type{display:inline-flex;align-items:center;justify-content:center;height:26px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:800;background:#f3f4f8;color:var(--muted)}
+.conn-type.mysql{background:#e8f8ef;color:#178a4c}
+.conn-type.redis{background:#fde8e8;color:#c24141}
+.conn-type.ssh,.conn-type.ftp{background:#eaf1ff;color:var(--accent)}
+.conn-type.sqlite{background:#f3f0e8;color:#8a6a2f}
+.conn-type.mongodb{background:#e9f7ee;color:#2f7d4a}
+.conn-main{min-width:0}
+.conn-main strong{display:block;font-size:14px;letter-spacing:-.02em}
+.conn-main small{display:block;margin-top:2px;color:var(--faint);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.conn-meta,.conn-time{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conn-time{font-variant-numeric:tabular-nums}
+.ad-list{display:grid;gap:12px}
+.ad-item{display:flex;align-items:center;gap:14px;min-width:0;background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px}
+.ad-main{flex:0 1 380px;min-width:0}
+.ad-metrics{display:flex;align-items:baseline;gap:8px;flex:none;padding:6px 10px;border:1px solid var(--line);border-radius:12px;background:#f7f8fb;white-space:nowrap}
+.ad-item .adm-actions{margin-left:auto}
+.ad-metrics strong{font-size:20px;letter-spacing:-.04em;line-height:1}
+.ad-metrics span,.ad-metrics small{display:block;color:var(--muted);font-size:11px;font-weight:700;line-height:1.25}
+.ad-metrics small{color:var(--faint)}
+.ad-cover{flex:none;width:148px;height:72px;border-radius:10px;overflow:hidden;background:#f4f5f8;display:grid;place-items:center;color:var(--faint);font-size:12px}
+.ad-cover img,.ad-preview img{display:block;width:100%;height:100%;object-fit:cover}
+.ad-main p,.ad-main small{color:var(--muted)}
+.ad-main p{margin:4px 0 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ad-link{display:block;margin-top:4px;color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ad-upload{display:grid;gap:8px;font-size:13px;font-weight:700;color:var(--muted)}
+.ad-upload-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.ad-file{display:none}
+.ad-preview{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#f7f8fb}
+.ad-preview img{display:block;width:100%;height:148px;object-fit:contain;background:#eef1f6}
+.adm-chart-note{margin:6px 0 0;color:var(--faint);font-size:12px;font-weight:650}
+.adm-line{position:relative;margin-top:8px}
+.adm-line svg{display:block;width:100%;height:248px}
+.adm-line .grid{stroke:#eef0f5;stroke-width:1}
+.adm-line .axis{fill:#9aa3b5;font-size:10px;text-anchor:end}
+.adm-line .axis.x{text-anchor:middle}
+.adm-line .fill{fill:url(#admVisitFill)}
+.adm-line .line{fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.adm-line .line.visits{stroke:#5b6cff}
+.adm-line .line.visitors{stroke:#2b7bb9;stroke-dasharray:5 4}
+.adm-line .line.clicks{stroke:#d9486e}
+.adm-line .guide{stroke:#cfd5e4;stroke-dasharray:3 3}
+.adm-line .dot.visits{fill:#5b6cff}
+.adm-line .dot.visitors{fill:#2b7bb9}
+.adm-line .dot.clicks{fill:#d9486e}
+.adm-tip{position:absolute;top:12px;right:12px;display:flex;gap:10px;padding:8px 10px;border-radius:10px;background:#ffffffeb;border:1px solid var(--line);font-size:12px;font-weight:700;color:var(--muted)}
+.adm-legend{display:flex;gap:16px;list-style:none;margin:4px 0 0;color:var(--muted);font-size:12px;font-weight:700}
+.adm-legend i{display:inline-block;width:14px;height:3px;border-radius:99px;margin-right:6px;vertical-align:middle}
+.adm-legend .visits{background:#5b6cff}
+.adm-legend .visitors{background:#2b7bb9}
+.adm-legend .clicks{background:#d9486e}
+@media (max-width: 1200px){.adm-stats.dense{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (max-width: 900px){.adm-shell{grid-template-columns:1fr}
+.adm-side{position:fixed;z-index:20;transform:translate(-105%);transition:transform .2s ease;width:240px}
+.adm-side.open{transform:none}
+.adm-menu{display:inline-flex;border:0;background:#f3f4f8;height:34px;padding:0 12px;border-radius:999px;font-weight:700;cursor:pointer}
+.adm-stats,.adm-stats.dense,.adm-grid,.adm-grid.visits,.adm-grid.visits-charts,.adm-two{grid-template-columns:1fr}
+.adm-donut{grid-template-columns:1fr;justify-items:center}
+.adm-content{padding:16px}
+.adm-table{display:block;overflow-x:auto}
+.conn-item{grid-template-columns:72px minmax(0,1fr) auto}
+.conn-meta,.conn-time{display:none}
+.ad-item{flex-wrap:wrap}
+.ad-main{flex:1 1 100%}
+.ad-item .adm-actions{margin-left:0}
+.ad-cover{width:100%;height:96px}
+}
+[hidden]{display:none!important}
+/* MONO.STT 站点补充：下载卡片版本标签（沿用原站徽章尺寸语言） */
+.dl-tag{display:inline-flex;align-items:center;margin-left:8px;padding:1px 8px;border-radius:999px;background:#111;color:#fff;font-size:12px;font-weight:700;vertical-align:middle}
+
+
+  </style>
+</head>
+<body>
+<div id="app"></div>
+<template id="page-index">
+<div class="page-shell grid-bg">
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a href="#/index" class="router-link-active router-link-exact-active brand" aria-current="page">
+        <span class="brand-mark"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWxsZWRieT0idGl0bGUgZGVzYyI+CiAgPHRpdGxlIGlkPSJ0aXRsZSI+TU9OTy5TVFQgZmF2aWNvbjwvdGl0bGU+CiAgPGRlc2MgaWQ9ImRlc2MiPjE2cHgg5LiT55So566A5YyW56ym5Y+377ya5LiJ5qC55aOw5rOi56uW5p2h5Yqg5LiA5Liq5L+h5Y+354K577yM5Zyo5p6B5bCP5bC65a+45LiL5LuN5Y+v6L6o6K6k44CCPC9kZXNjPgogIDxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0IiBmaWxsPSIjMDkwOTBCIi8+CiAgPGcgZmlsbD0iI0ZGRkZGRiI+CiAgICA8cmVjdCB4PSIxMiIgeT0iMjQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iNCIvPgogICAgPHJlY3QgeD0iMjQiIHk9IjE2IiB3aWR0aD0iOCIgaGVpZ2h0PSIzMiIgcng9IjQiLz4KICAgIDxyZWN0IHg9IjM2IiB5PSIyMSIgd2lkdGg9IjgiIGhlaWdodD0iMjIiIHJ4PSI0Ii8+CiAgPC9nPgogIDxjaXJjbGUgY2xhc3M9InNpZ25hbC1kb3QiIGN4PSI1MCIgY3k9IjM4IiByPSI0IiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPgo=" width="32" height="32" alt=""></span> MONO.STT
+      </a>
+      <nav class="nav" aria-label="主导航">
+        <a href="#/index/features" class="router-link-active router-link-exact-active" aria-current="page">产品</a>
+        <a href="#/pricing">开源</a>
+        <a href="#/changelog">更新日志</a>
+        <a href="#/releases">历史版本</a>
+        <a href="#/docs">文档</a>
+      </nav>
+      <a href="#/index/download" class="header-download">下载</a>
+      <button class="menu-btn" type="button" aria-label="打开菜单">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+      </button>
+    </div>
+    <div class="mobile-nav wrap">
+      <a href="#/index/features">产品</a>
+      <a href="#/pricing">开源</a>
+      <a href="#/changelog">更新日志</a>
+      <a href="#/releases">历史版本</a>
+      <a href="#/docs">文档</a>
+      <a href="#/index/download">下载</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero wrap">
+      <h1> 本地音视频转录工具 </h1>
+      <p class="formula"> MONO.STT <span>=</span> Whisper <span>+</span> 时间轴校对 <span>+</span> 批量导出 <span>+</span> 飞书 </p>
+      <p class="hero-lead">全本地、离线可用、数据不出本机，<span>让访谈与会议记录更好整理🚀</span></p>
+      <ul class="platforms">
+        <li class="platform">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <path fill="#00A4EF" d="M6 10.2 21.2 8.1v14.6H6z"></path>
+            <path fill="#7FBA00" d="M23.2 7.8 42 5v17.7H23.2z"></path>
+            <path fill="#F25022" d="M6 26.3h15.2V41L6 38.8z"></path>
+            <path fill="#FFB900" d="M23.2 26.3H42V43.2L23.2 40.8z"></path>
+          </svg> Windows x64
+        </li>
+        <li class="platform">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <rect x="8" y="10" width="32" height="22" rx="3" fill="#111"></rect>
+            <rect x="18" y="32" width="12" height="3" rx="1" fill="#111"></rect>
+            <rect x="14" y="35" width="20" height="3" rx="1.5" fill="#111"></rect>
+          </svg> macOS 14+
+        </li>
+        <li class="platform">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <rect x="13" y="13" width="22" height="22" rx="4" fill="none" stroke="#111" stroke-width="3"></rect>
+            <rect x="20" y="20" width="8" height="8" rx="2" fill="#111"></rect>
+            <path d="M19 6v7M29 6v7M19 35v7M29 35v7M6 19h7M6 29h7M35 19h7M35 29h7" stroke="#111" stroke-width="3" stroke-linecap="round"></path>
+          </svg> 本地运行
+        </li>
+      </ul>
+      <div class="cta-row">
+        <a class="btn btn-dark" href="#/index/download"> ↓ 立即下载 <span class="kbd">D</span></a>
+        <a class="btn btn-light" href="#/index/features"> 查看功能 <span class="kbd">M</span></a>
+      </div>
+    </section>
+
+    <section id="features" class="section wrap">
+      <h2 class="section-title">MONO.STT 导入、校对、导出与分享</h2>
+
+      <article class="feature">
+        <div class="feature-copy">
+          <h3>拖进音视频，逐字稿就出来了</h3>
+          <p> 转录在本机完成，模型也由本机管理。批量导入自动排队，片段逐段显示，不用把素材上传到任何服务。 </p>
+          <ul>
+            <li>内置 Whisper Large v3 Turbo 与 Whisper Large v3</li>
+            <li>Windows 可用 CPU 或 NVIDIA CUDA，macOS 使用 CPU</li>
+            <li>队列支持取消、重试与重启后恢复</li>
+            <li>每个文件可单独配置纠错词与热词</li>
+          </ul>
+        </div>
+        <div>
+          <div class="pills">
+            <button class="pill active" data-agent="import">导入转录</button>
+            <button class="pill" data-agent="review">时间轴校对</button>
+            <button class="pill" data-agent="export">批量导出</button>
+          </div>
+          <div class="mock" aria-label="转录工作流示意">
+            <div class="mock-bar">
+              <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+              <span data-agent-title>导入转录</span>
+            </div>
+            <div class="mock-body" style="grid-template-columns: 1fr;">
+              <div class="mock-main">
+                <span class="chip">本地工作流</span>
+                <p style="margin: 12px 0 0;" data-agent-prompt>访谈录音.m4a · Whisper Large v3 Turbo</p>
+                <div class="sql">
+                  <b># 生成结果</b><br>
+                  <em data-agent-result>00:00:03 今天我们聊聊产品从零到一的过程……</em>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="feature reverse">
+        <div class="feature-copy">
+          <h3>时间轴校对，点一下就回到那一句</h3>
+          <p>逐字稿和时间戳一起保存。点击时间戳跳转回听，可调播放速度、开启滚动跟随，边听边改。</p>
+          <ul>
+            <li>点击时间戳跳转回听，支持调整播放速度</li>
+            <li>滚动跟随与「回到当前朗读行」</li>
+            <li>直接编辑逐字稿文字并保存</li>
+            <li>转录片段逐段显示，长音频不必等全部完成</li>
+          </ul>
+        </div>
+        <div class="mock" aria-label="逐字稿校对示意">
+          <div class="mock-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span> 访谈录音.m4a · 逐字稿 </div>
+          <div class="mock-body">
+            <aside class="mock-side">
+              <div class="side-item">00:00:03</div>
+              <div class="side-item active">00:01:12</div>
+              <div class="side-item">00:02:40</div>
+              <div class="side-item">00:04:05</div>
+            </aside>
+            <div class="mock-main">
+              <div class="sql"><b>逐字稿</b> · 已回听 2 处 · 修改 1 处</div>
+              <table class="table">
+                <thead><tr><th>时间</th><th>内容</th></tr></thead>
+                <tbody>
+                  <tr><td>00:00:03</td><td>今天我们聊聊产品从零到一的过程</td></tr>
+                  <tr><td>00:01:12</td><td>先把素材整理成逐字稿，再做校对</td></tr>
+                  <tr><td>00:02:40</td><td>导出时可以同时带上时间戳</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="feature">
+        <div class="feature-copy">
+          <h3>导出与飞书，交给下一步</h3>
+          <p>单条记录可导出 TXT、Markdown 和 SRT；多条记录可批量打包成 ZIP，也能直接发布到飞书云文档。</p>
+          <ul>
+            <li>单条导出 TXT / Markdown / SRT</li>
+            <li>批量导出支持搜索、分页与跨页勾选</li>
+            <li>TXT、SRT 或两种格式打包进一个 ZIP</li>
+            <li>配置飞书自建应用后可创建、更新、删除关联文档</li>
+          </ul>
+        </div>
+        <div class="mock" aria-label="批量导出示意">
+          <div class="mock-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span> 批量导出 · 转录记录 </div>
+          <div class="mock-body">
+            <aside class="mock-side">
+              <div class="side-item">全部记录</div>
+              <div class="side-item active">已选 12 条</div>
+              <div class="side-item">TXT + SRT</div>
+              <div class="side-item">ZIP 打包</div>
+            </aside>
+            <div class="mock-main">
+              <p><strong>MONO.STT_导出_20261127.zip</strong> · 12 个文件</p>
+              <table class="table">
+                <thead><tr><th>文件</th><th>格式</th></tr></thead>
+                <tbody>
+                  <tr><td>访谈录音.m4a.txt</td><td>TXT</td></tr>
+                  <tr><td>访谈录音.m4a.srt</td><td>SRT</td></tr>
+                  <tr><td>周会记录.mp3.txt</td><td>TXT</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="feature reverse">
+        <div class="feature-copy">
+          <h3>数据留在你自己的设备上</h3>
+          <p>转录记录、回听音轨和模型都放在本机目录。只有下载模型、检查更新和主动发布到飞书时才需要网络。</p>
+          <ul>
+            <li>Windows：安装目录下的 data/ 与 models/</li>
+            <li>macOS：~/Library/Application Support/MONO.STT/</li>
+            <li>记录保存在 data/mono.db，音轨在 data/audio/</li>
+            <li>删除记录会清理配套音频，导入原件保持原位</li>
+          </ul>
+        </div>
+        <div class="mock" aria-label="本地数据目录示意">
+          <div class="mock-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span> MONO.STT · 数据目录 </div>
+          <div class="term">
+            <div>MONO.STT/</div>
+            <div>├─ data/</div>
+            <div>│&nbsp; ├─ <span class="cmd">mono.db</span>&nbsp;&nbsp;&nbsp; 转录记录与设置</div>
+            <div>│&nbsp; └─ <span class="cmd">audio/</span>&nbsp;&nbsp;&nbsp;&nbsp; 回听音轨</div>
+            <div>├─ <span class="cmd">models/</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 模型权重（可改目录）</div>
+            <div>└─ <span class="ok">离线转录 ✓</span>&nbsp; 素材不上传</div>
+            <div>&nbsp;</div>
+            <div>联网仅限：下载模型 / 检查更新 / 发布飞书</div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="section">
+      <div class="wrap"><h2 class="section-title">支持的格式与能力</h2></div>
+      <div class="marquee-wrap">
+        <div class="marquee">
+          <div class="proto">音频</div><div class="proto">视频</div><div class="proto">批量导入</div><div class="proto">逐字稿</div><div class="proto">时间戳</div><div class="proto">TXT</div><div class="proto">Markdown</div><div class="proto">SRT</div><div class="proto">ZIP</div><div class="proto">飞书云文档</div><div class="proto">Whisper v3 Turbo</div><div class="proto">Whisper v3</div><div class="proto">CPU</div><div class="proto">NVIDIA CUDA</div>
+          <div class="proto">音频</div><div class="proto">视频</div><div class="proto">批量导入</div><div class="proto">逐字稿</div><div class="proto">时间戳</div><div class="proto">TXT</div><div class="proto">Markdown</div><div class="proto">SRT</div><div class="proto">ZIP</div><div class="proto">飞书云文档</div><div class="proto">Whisper v3 Turbo</div><div class="proto">Whisper v3</div><div class="proto">CPU</div><div class="proto">NVIDIA CUDA</div>
+        </div>
+        <div class="marquee alt">
+          <div class="proto">NVIDIA CUDA</div><div class="proto">CPU</div><div class="proto">Whisper v3</div><div class="proto">Whisper v3 Turbo</div><div class="proto">飞书云文档</div><div class="proto">ZIP</div><div class="proto">SRT</div><div class="proto">Markdown</div><div class="proto">TXT</div><div class="proto">时间戳</div><div class="proto">逐字稿</div><div class="proto">批量导入</div><div class="proto">视频</div><div class="proto">音频</div>
+          <div class="proto">音频</div><div class="proto">视频</div><div class="proto">批量导入</div><div class="proto">逐字稿</div><div class="proto">时间戳</div><div class="proto">TXT</div><div class="proto">Markdown</div><div class="proto">SRT</div><div class="proto">ZIP</div><div class="proto">飞书云文档</div><div class="proto">Whisper v3 Turbo</div><div class="proto">Whisper v3</div><div class="proto">CPU</div><div class="proto">NVIDIA CUDA</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="download" class="section wrap">
+      <h2 class="section-title">下载客户端</h2>
+      <div class="download-grid">
+        <article class="dl-card" data-card="mac">
+          <h3>Mac</h3>
+          <p>macOS 14+ · Apple Silicon</p>
+          <p class="dl-meta"><span data-dl-meta>v0.1.7 · DMG · 108.2 MB</span><span class="dl-tag">最新版</span></p>
+          <div class="os-tabs">
+            <button class="active" data-os="latest">最新 0.1.7</button>
+            <button data-os="prev">上一版 0.1.6</button>
+          </div>
+          <a class="dl-btn" data-dl-btn href="https://github.com/Rui333333/MONO.STT/releases/download/v0.1.7/MONO.STT_0.1.7_arm64.dmg">下载 DMG 安装包</a>
+        </article>
+        <article class="dl-card current" data-card="windows">
+          <p class="current-badge">当前系统</p>
+          <h3>Windows</h3>
+          <p>Windows 10 / 11 · x64</p>
+          <p class="dl-meta"><span data-dl-meta>v0.1.7 · EXE 安装版 · 139.5 MB</span><span class="dl-tag">最新版</span></p>
+          <div class="os-tabs">
+            <button class="active" data-os="latest">最新 0.1.7</button>
+            <button data-os="prev">上一版 0.1.6</button>
+          </div>
+          <a class="dl-btn" data-dl-btn href="https://github.com/Rui333333/MONO.STT/releases/download/v0.1.7/MONO.STT_0.1.7_x64-setup.exe">下载 EXE 安装版</a>
+        </article>
+        <article class="dl-card" data-card="source">
+          <h3>源码构建</h3>
+          <p>MIT 开源 · 自行打包</p>
+          <p class="dl-meta"><span data-dl-meta>Rust + Python · Windows / macOS</span><span class="dl-tag">开源</span></p>
+          <div class="os-tabs">
+            <button class="active" data-os="readme">构建说明</button>
+            <button data-os="release">Releases</button>
+          </div>
+          <a class="dl-btn" data-dl-btn href="https://github.com/Rui333333/MONO.STT#从源码构建">查看构建说明</a>
+        </article>
+      </div>
+      <p class="hist-more"> 需要旧版本？前往 <a href="#/releases">历史版本</a> 下载，或到 <a href="https://github.com/Rui333333/MONO.STT/releases" target="_blank" rel="noopener noreferrer">GitHub Releases</a> 查看全部。 </p>
+    </section>
+
+    <section class="section wrap">
+      <div class="faq-head">
+        <h2 class="section-title" style="margin-bottom: 8px;">常见问题</h2>
+        <p>关于 MONO.STT，你想知道的都在这里。</p>
+      </div>
+      <div class="faq">
+        <div class="faq-item">
+          <button type="button" aria-expanded="true">MONO.STT 是免费的吗？ <span>−</span></button>
+          <div class="body">是。项目采用 MIT 许可证开源，桌面客户端可免费下载和使用，没有账号、订阅或功能限制。</div>
+        </div>
+        <div class="faq-item">
+          <button type="button" aria-expanded="false">音频和逐字稿会上传到云端吗？ <span>+</span></button>
+          <div class="body" hidden>不会。语音识别和回听都在本机运行，转录记录保存在 data/mono.db。只有下载模型、检查更新，以及你主动发布到飞书云文档时才会联网。</div>
+        </div>
+        <div class="faq-item">
+          <button type="button" aria-expanded="false">支持哪些系统和设备？ <span>+</span></button>
+          <div class="body" hidden>Windows x64（CPU 或兼容的 NVIDIA CUDA），以及 macOS 14 及以上的 Apple Silicon（CPU）。当前没有 Intel Mac 与 Linux 的官方安装包。</div>
+        </div>
+        <div class="faq-item">
+          <button type="button" aria-expanded="false">需要自己准备模型吗？ <span>+</span></button>
+          <div class="body" hidden>不需要。安装包内置转录引擎，首次启动按引导下载模型，或直接选择本机已有的模型目录；提供 Whisper Large v3 Turbo 与 Whisper Large v3，并用内置普通话音频试转录。</div>
+        </div>
+        <div class="faq-item">
+          <button type="button" aria-expanded="false">遇到问题如何反馈？ <span>+</span></button>
+          <div class="body" hidden>请到 GitHub Issues 提交，附上版本号（当前 0.1.7）、操作系统和复现步骤，并注意隐藏密码、API Key 与内网地址。</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <h2>产品与协议</h2>
+          <a href="#/index">MONO.STT 首页</a>
+          <a href="#/pricing">开源与获取</a>
+          <a href="#/docs">使用文档</a>
+          <a href="https://github.com/Rui333333/MONO.STT/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT 许可证</a>
+          <a href="#/docs/privacy">数据与隐私</a>
+        </div>
+        <div>
+          <h2>资源与支持</h2>
+          <a href="#/docs">使用文档</a>
+          <a href="#/changelog">更新日志</a>
+          <a href="#/releases">历史版本</a>
+          <a href="https://github.com/Rui333333/MONO.STT/issues" target="_blank" rel="noopener noreferrer">问题反馈</a>
+        </div>
+        <div>
+          <h2>联系我们</h2>
+          <p>Rui333333 · 开源维护者</p>
+          <a href="https://github.com/Rui333333/MONO.STT/issues" target="_blank" rel="noopener noreferrer">GitHub Issues</a>
+          <p>转录与回听在本机完成，素材不上传。</p>
+        </div>
+      </div>
+      <p class="copy">© 2026 Rui333333 · MONO.STT · MIT License</p>
+      <!-- 上线部署到国内域名时，请把下面两个链接替换为自己的 ICP / 公安备案信息 -->
+      <p class="beian"><a href="https://github.com/Rui333333/MONO.STT" target="_blank" rel="noopener noreferrer">GitHub 仓库</a><a href="https://github.com/Rui333333/MONO.STT/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">开源许可 · MIT</a></p>
+    </div>
+  </footer>
+</div>
+</template>
+<template id="page-pricing">
+<div class="page-shell grid-bg">
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a href="#/index" class="brand">
+        <span class="brand-mark"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWxsZWRieT0idGl0bGUgZGVzYyI+CiAgPHRpdGxlIGlkPSJ0aXRsZSI+TU9OTy5TVFQgZmF2aWNvbjwvdGl0bGU+CiAgPGRlc2MgaWQ9ImRlc2MiPjE2cHgg5LiT55So566A5YyW56ym5Y+377ya5LiJ5qC55aOw5rOi56uW5p2h5Yqg5LiA5Liq5L+h5Y+354K577yM5Zyo5p6B5bCP5bC65a+45LiL5LuN5Y+v6L6o6K6k44CCPC9kZXNjPgogIDxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0IiBmaWxsPSIjMDkwOTBCIi8+CiAgPGcgZmlsbD0iI0ZGRkZGRiI+CiAgICA8cmVjdCB4PSIxMiIgeT0iMjQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iNCIvPgogICAgPHJlY3QgeD0iMjQiIHk9IjE2IiB3aWR0aD0iOCIgaGVpZ2h0PSIzMiIgcng9IjQiLz4KICAgIDxyZWN0IHg9IjM2IiB5PSIyMSIgd2lkdGg9IjgiIGhlaWdodD0iMjIiIHJ4PSI0Ii8+CiAgPC9nPgogIDxjaXJjbGUgY2xhc3M9InNpZ25hbC1kb3QiIGN4PSI1MCIgY3k9IjM4IiByPSI0IiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPgo=" width="32" height="32" alt=""></span> MONO.STT
+      </a>
+      <nav class="nav" aria-label="主导航">
+        <a href="#/index/features">产品</a>
+        <a href="#/pricing" class="router-link-active router-link-exact-active" aria-current="page">开源</a>
+        <a href="#/changelog">更新日志</a>
+        <a href="#/releases">历史版本</a>
+        <a href="#/docs">文档</a>
+      </nav>
+      <a href="#/index/download" class="header-download">下载</a>
+      <button class="menu-btn" type="button" aria-label="打开菜单">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+      </button>
+    </div>
+    <div class="mobile-nav wrap">
+      <a href="#/index/features">产品</a>
+      <a href="#/pricing">开源</a>
+      <a href="#/changelog">更新日志</a>
+      <a href="#/releases">历史版本</a>
+      <a href="#/docs">文档</a>
+      <a href="#/index/download">下载</a>
+    </div>
+  </header>
+
+  <main class="subpage wrap pricing">
+    <header class="pricing-head">
+      <p class="pricing-kicker">OPEN SOURCE</p>
+      <h1>免费开源，按你的方式用</h1>
+      <h2>获取方式</h2>
+      <p class="lead">直接下载安装包、从源码构建，或者参与进来一起改进 —— 全部免费，MIT 许可证。</p>
+    </header>
+    <div class="price-grid">
+      <article class="price">
+        <p class="tier">Desktop</p>
+        <h3>桌面客户端</h3>
+        <div class="num"><span>¥</span>0</div>
+        <p class="period">永久免费</p>
+        <p class="blurb">下载即用，内置转录引擎与本地模型管理，适合整理访谈、课程和会议记录。</p>
+        <ul>
+          <li>Windows x64 与 macOS 14+ Apple Silicon</li>
+          <li>内置转录引擎，首次启动引导下载模型</li>
+          <li>逐字稿校对、导出与飞书发布</li>
+          <li>无账号、无订阅、无功能限制</li>
+        </ul>
+        <a href="#/index/download" class="dl-btn">立即下载</a>
+      </article>
+      <article class="price featured">
+        <p class="badge">完整源码</p>
+        <p class="tier">Source</p>
+        <h3>源码构建</h3>
+        <div class="bill-toggle" role="tablist" aria-label="获取方式切换">
+          <button type="button" role="tab" aria-selected="true" class="active" data-bill="year"> 下载安装包 </button>
+          <button type="button" role="tab" aria-selected="false" data-bill="life"> 从源码构建 </button>
+        </div>
+        <div class="num" data-price-num><span>¥</span>0</div>
+        <p class="period" data-price-period>GitHub Releases · 预编译安装包</p>
+        <p class="blurb" data-price-blurb>官方安装包内置转录引擎，经过签名与冒烟验证；下载即可在 Windows 与 macOS 上使用。</p>
+        <ul>
+          <li>Tauri 桌面端 + Python 转录引擎完整源码</li>
+          <li>Windows：pwsh build-windows.ps1 -Slim</li>
+          <li>macOS：GitHub Actions 打包 arm64 DMG</li>
+          <li>可自定义更新签名与安装包签名</li>
+        </ul>
+        <a href="#/index/download" data-price-cta class="dl-btn">下载安装包</a>
+      </article>
+      <article class="price">
+        <p class="tier">Community</p>
+        <h3>参与贡献</h3>
+        <div class="num"><span>¥</span>0</div>
+        <p class="period">随时加入</p>
+        <p class="blurb">发现问题、提出想法或补齐文档，都可以在仓库里直接交流。</p>
+        <ul>
+          <li>通过 GitHub Issues 反馈问题与建议</li>
+          <li>提交 Pull Request 改进功能</li>
+          <li>补充使用文档与示例素材</li>
+          <li>第三方依赖、字体与模型权重适用各自许可</li>
+        </ul>
+        <a href="https://github.com/Rui333333/MONO.STT" target="_blank" rel="noopener noreferrer" class="dl-btn">打开 GitHub 仓库</a>
+      </article>
+    </div>
+    <section class="pricing-team">
+      <p class="pricing-kicker">BUILD YOUR OWN</p>
+      <h2>想接进自己的工作流？</h2>
+      <p>源码开放，可以按需调整导出格式、模型目录与发布流程。企业内网使用前，请先阅读 README 里的数据位置与联网说明。</p>
+      <a href="https://github.com/Rui333333/MONO.STT#readme" target="_blank" rel="noopener noreferrer">阅读 README →</a>
+    </section>
+    <section class="pricing-faq">
+      <div class="faq-head">
+        <p class="pricing-kicker">FAQ</p>
+        <h2>开始之前，你可能想了解</h2>
+        <p>关于 MONO.STT，你想知道的都在这里。</p>
+      </div>
+      <div class="faq">
+        <div class="faq-item">
+          <button type="button" aria-expanded="true">需要先付费或注册账号吗？ <span>−</span></button>
+          <div class="body">都不需要。项目采用 MIT 许可证开源，下载安装包即可使用全部功能，没有账号、订阅或试用限制。</div>
+        </div>
+        <div class="faq-item">
+          <button type="button" aria-expanded="false">源码构建和直接下载有什么区别？ <span>+</span></button>
+          <div class="body" hidden>功能一致。官方安装包内置转录引擎并经过签名与冒烟验证；从源码构建可以自由控制构建参数、模型目录和更新签名，但需要准备 Rust、Python、Tauri 等工具链。</div>
+        </div>
+        <div class="faq-item">
+          <button type="button" aria-expanded="false">模型需要额外付费吗？ <span>+</span></button>
+          <div class="body" hidden>不需要向 MONO.STT 付费。首次启动时按引导下载 Whisper 模型权重，或直接关联本机已有的模型目录；第三方模型权重适用各自的许可证。</div>
+        </div>
+        <div class="faq-item">
+          <button type="button" aria-expanded="false">可以商用或二次开发吗？ <span>+</span></button>
+          <div class="body" hidden>可以。MIT 许可证允许自由使用、修改和分发，需保留版权与许可声明。第三方依赖、字体和模型权重请另行确认各自的许可条款。</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <h2>产品与协议</h2>
+          <a href="#/index">MONO.STT 首页</a>
+          <a href="#/pricing">开源与获取</a>
+          <a href="#/docs">使用文档</a>
+          <a href="https://github.com/Rui333333/MONO.STT/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT 许可证</a>
+          <a href="#/docs/privacy">数据与隐私</a>
+        </div>
+        <div>
+          <h2>资源与支持</h2>
+          <a href="#/docs">使用文档</a>
+          <a href="#/changelog">更新日志</a>
+          <a href="#/releases">历史版本</a>
+          <a href="https://github.com/Rui333333/MONO.STT/issues" target="_blank" rel="noopener noreferrer">问题反馈</a>
+        </div>
+        <div>
+          <h2>联系我们</h2>
+          <p>Rui333333 · 开源维护者</p>
+          <a href="https://github.com/Rui333333/MONO.STT/issues" target="_blank" rel="noopener noreferrer">GitHub Issues</a>
+          <p>转录与回听在本机完成，素材不上传。</p>
+        </div>
+      </div>
+      <p class="copy">© 2026 Rui333333 · MONO.STT · MIT License</p>
+      <!-- 上线部署到国内域名时，请把下面两个链接替换为自己的 ICP / 公安备案信息 -->
+      <p class="beian"><a href="https://github.com/Rui333333/MONO.STT" target="_blank" rel="noopener noreferrer">GitHub 仓库</a><a href="https://github.com/Rui333333/MONO.STT/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">开源许可 · MIT</a></p>
+    </div>
+  </footer>
+</div>
+</template>
+<template id="page-changelog">
+<div class="page-shell grid-bg">
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a href="#/index" class="brand">
+        <span class="brand-mark"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWxsZWRieT0idGl0bGUgZGVzYyI+CiAgPHRpdGxlIGlkPSJ0aXRsZSI+TU9OTy5TVFQgZmF2aWNvbjwvdGl0bGU+CiAgPGRlc2MgaWQ9ImRlc2MiPjE2cHgg5LiT55So566A5YyW56ym5Y+377ya5LiJ5qC55aOw5rOi56uW5p2h5Yqg5LiA5Liq5L+h5Y+354K577yM5Zyo5p6B5bCP5bC65a+45LiL5LuN5Y+v6L6o6K6k44CCPC9kZXNjPgogIDxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0IiBmaWxsPSIjMDkwOTBCIi8+CiAgPGcgZmlsbD0iI0ZGRkZGRiI+CiAgICA8cmVjdCB4PSIxMiIgeT0iMjQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iNCIvPgogICAgPHJlY3QgeD0iMjQiIHk9IjE2IiB3aWR0aD0iOCIgaGVpZ2h0PSIzMiIgcng9IjQiLz4KICAgIDxyZWN0IHg9IjM2IiB5PSIyMSIgd2lkdGg9IjgiIGhlaWdodD0iMjIiIHJ4PSI0Ii8+CiAgPC9nPgogIDxjaXJjbGUgY2xhc3M9InNpZ25hbC1kb3QiIGN4PSI1MCIgY3k9IjM4IiByPSI0IiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPgo=" width="32" height="32" alt=""></span> MONO.STT
+      </a>
+      <nav class="nav" aria-label="主导航">
+        <a href="#/index/features">产品</a>
+        <a href="#/pricing">开源</a>
+        <a href="#/changelog" class="router-link-active router-link-exact-active" aria-current="page">更新日志</a>
+        <a href="#/releases">历史版本</a>
+        <a href="#/docs">文档</a>
+      </nav>
+      <a href="#/index/download" class="header-download">下载</a>
+      <button class="menu-btn" type="button" aria-label="打开菜单">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+      </button>
+    </div>
+    <div class="mobile-nav wrap">
+      <a href="#/index/features">产品</a>
+      <a href="#/pricing">开源</a>
+      <a href="#/changelog">更新日志</a>
+      <a href="#/releases">历史版本</a>
+      <a href="#/docs">文档</a>
+      <a href="#/index/download">下载</a>
+    </div>
+  </header>
+
+  <main class="subpage wrap">
+    <h1>更新日志</h1>
+    <p class="lead">记录每个公开版本实际交付的能力。需要安装包请到「历史版本」下载。</p>
+    <div class="card-list">
+      <article class="card">
+        <h2>0.1.7 <span> · 2026-11-27</span><span class="hist-latest">最新</span></h2>
+        <ul>
+          <li>移除应用内录音、麦克风选择和相关权限</li>
+          <li>「新建转录」直接进入音视频导入页，支持文件选择和拖放</li>
+          <li>已有转录记录的回听、编辑和导出功能继续可用</li>
+        </ul>
+      </article>
+      <article class="card">
+        <h2>0.1.6 <span> · 2026-11-26</span></h2>
+        <ul>
+          <li>转录片段逐段显示，队列支持取消、重试和重启恢复</li>
+          <li>每个音视频文件可单独配置纠错词和热词</li>
+          <li>转录时间戳限制在实际音轨范围内</li>
+        </ul>
+      </article>
+      <article class="card">
+        <h2>0.1.5 <span> · 2026-11-25</span></h2>
+        <ul>
+          <li>新增 macOS 14+ Apple Silicon 支持，内置 CPU 转录引擎</li>
+          <li>批量导出 SRT、TXT 或全部格式到一个 ZIP，支持搜索、分页与跨页勾选</li>
+          <li>新版 Windows 安装器与卸载确认窗口，卸载时保留记录、设置和模型</li>
+          <li>飞书发布支持删除已关联的云文档</li>
+        </ul>
+      </article>
+      <article class="card">
+        <h2>0.1.4 <span> · 2026-11-25</span></h2>
+        <ul>
+          <li>首个支持应用内更新的版本，0.1.3 用户需下载安装包覆盖安装</li>
+          <li>在「偏好设置 → 通用 → 检查更新」查看当前版本与可用更新</li>
+          <li>改进确认转录页与「更多操作」菜单</li>
+        </ul>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <h2>产品与协议</h2>
+          <a href="#/index">MONO.STT 首页</a>
+          <a href="#/pricing">开源与获取</a>
+          <a href="#/docs">使用文档</a>
+          <a href="https://github.com/Rui333333/MONO.STT/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT 许可证</a>
+          <a href="#/docs/privacy">数据与隐私</a>
+        </div>
+        <div>
+          <h2>资源与支持</h2>
+          <a href="#/docs">使用文档</a>
+          <a href="#/changelog">更新日志</a>
+          <a href="#/releases">历史版本</a>
+          <a href="https://github.com/Rui333333/MONO.STT/issues" target="_blank" rel="noopener noreferrer">问题反馈</a>
+        </div>
+        <div>
+          <h2>联系我们</h2>
+          <p>Rui333333 · 开源维护者</p>
+          <a href="https://github.com/Rui333333/MONO.STT/issues" target="_blank" rel="noopener noreferrer">GitHub Issues</a>
+          <p>转录与回听在本机完成，素材不上传。</p>
+        </div>
+      </div>
+      <p class="copy">© 2026 Rui333333 · MONO.STT · MIT License</p>
+      <!-- 上线部署到国内域名时，请把下面两个链接替换为自己的 ICP / 公安备案信息 -->
+      <p class="beian"><a href="https://github.com/Rui333333/MONO.STT" target="_blank" rel="noopener noreferrer">GitHub 仓库</a><a href="https://github.com/Rui333333/MONO.STT/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">开源许可 · MIT</a></p>
+    </div>
+  </footer>
+</div>
+</template>
+<template id="page-releases">
+<div class="page-shell grid-bg">
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a href="#/index" class="brand">
+        <span class="brand-mark"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWxsZWRieT0idGl0bGUgZGVzYyI+CiAgPHRpdGxlIGlkPSJ0aXRsZSI+TU9OTy5TVFQgZmF2aWNvbjwvdGl0bGU+CiAgPGRlc2MgaWQ9ImRlc2MiPjE2cHgg5LiT55So566A5YyW56ym5Y+377ya5LiJ5qC55aOw5rOi56uW5p2h5Yqg5LiA5Liq5L+h5Y+354K577yM5Zyo5p6B5bCP5bC65a+45LiL5LuN5Y+v6L6o6K6k44CCPC9kZXNjPgogIDxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0IiBmaWxsPSIjMDkwOTBCIi8+CiAgPGcgZmlsbD0iI0ZGRkZGRiI+CiAgICA8cmVjdCB4PSIxMiIgeT0iMjQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iNCIvPgogICAgPHJlY3QgeD0iMjQiIHk9IjE2IiB3aWR0aD0iOCIgaGVpZ2h0PSIzMiIgcng9IjQiLz4KICAgIDxyZWN0IHg9IjM2IiB5PSIyMSIgd2lkdGg9IjgiIGhlaWdodD0iMjIiIHJ4PSI0Ii8+CiAgPC9nPgogIDxjaXJjbGUgY2xhc3M9InNpZ25hbC1kb3QiIGN4PSI1MCIgY3k9IjM4IiByPSI0IiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPgo=" width="32" height="32" alt=""></span> MONO.STT
+      </a>
+      <nav class="nav" aria-label="主导航">
+        <a href="#/index/features">产品</a>
+        <a href="#/pricing">开源</a>
+        <a href="#/changelog">更新日志</a>
+        <a href="#/releases" class="router-link-active router-link-exact-active" aria-current="page">历史版本</a>
+        <a href="#/docs">文档</a>
+      </nav>
+      <a href="#/index/download" class="header-download">下载</a>
+      <button class="menu-btn" type="button" aria-label="打开菜单">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+      </button>
+    </div>
+    <div class="mobile-nav wrap">
+      <a href="#/index/features">产品</a>
+      <a href="#/pricing">开源</a>
+      <a href="#/changelog">更新日志</a>
+      <a href="#/releases">历史版本</a>
+      <a href="#/docs">文档</a>
+      <a href="#/index/download">下载</a>
+    </div>
+  </header>
+
+  <main class="subpage wrap">
+    <h1>历史版本</h1>
+    <p class="lead">所有已发布的客户端安装包，最新版本排在最前面。首页下载区始终提供当前最新包，全部文件托管在 GitHub Releases。</p>
+    <div class="card-list hist-list">
+      <article class="card hist-card">
+        <div class="hist-head">
+          <h2> v0.1.7 <span class="hist-latest">最新</span></h2>
+          <time>2026-11-27 10:05</time>
+        </div>
+        <ul class="hist-notes">
+          <li>移除应用内录音、麦克风选择和相关权限</li>
+          <li>「新建转录」直接进入音视频导入页，支持文件选择和拖放</li>
+          <li>已有转录记录的回听、编辑和导出功能继续可用</li>
+        </ul>
+        <div class="hist-files">
+          <a class="hist-file" href="https://github.com/Rui333333/MONO.STT/releases/download/v0.1.7/MONO.STT_0.1.7_x64-setup.exe"><strong>Windows x64 · EXE</strong><span>139.5 MB</span></a>
+          <a class="hist-file" href="https://github.com/Rui333333/MONO.STT/releases/download/v0.1.7/MONO.STT_0.1.7_arm64.dmg"><strong>macOS Apple Silicon · DMG</strong><span>108.2 MB</span></a>
+        </div>
+      </article>
+      <article class="card hist-card">
+        <div class="hist-head">
+          <h2> v0.1.6 </h2>
+          <time>2026-11-26 18:15</time>
+        </div>
+        <ul class="hist-notes">
+          <li>转录片段逐段显示，队列支持取消、重试和重启恢复</li>
+          <li>每个音视频文件可单独配置纠错词和热词</li>
+          <li>转录时间戳限制在实际音轨范围内</li>
+        </ul>
+        <div class="hist-files">
+          <a class="hist-file" href="https://github.com/Rui333333/MONO.STT/releases/download/v0.1.6/MONO.STT_0.1.6_x64-setup.exe"><strong>Windows x64 · EXE</strong><span>139.6 MB</span></a>
+          <a class="hist-file" href="https://github.com/Rui333333/MONO.STT/releases/download/v0.1.6/MONO.STT_0.1.6_arm64.dmg"><strong>macOS Apple Silicon · DMG</strong><span>106.7 MB</span></a>
+        </div>
+      </article>
+      <article class="card hist-card">
+        <div class="hist-head">
+          <h2> v0.1.5 </h2>
+          <time>2026-11-25 18:10</time>
+        </div>
+        <ul class="hist-notes">
+          <li>首个 macOS Apple Silicon 版本，最低系统版本 macOS 14</li>
+          <li>批量导出 SRT、TXT 或全部格式到一个 ZIP</li>
+          <li>新版 Windows 安装器、卸载确认与飞书云文档删除</li>
+        </ul>
+        <div class="hist-files">
+          <a class="hist-file" href="https://github.com/Rui333333/MONO.STT/releases/download/v0.1.5/MONO.STT_0.1.5_x64-setup.exe"><strong>Windows x64 · EXE</strong><span>139.5 MB</span></a>
+          <a class="hist-file" href="https://github.com/Rui333333/MONO.STT/releases/download/v0.1.5/MONO.STT_0.1.5_arm64.dmg"><strong>macOS Apple Silicon · DMG</strong><span>108.2 MB</span></a>
+        </div>
+      </article>
+      <article class="card hist-card">
+        <div class="hist-head">
+          <h2> v0.1.4 </h2>
+          <time>2026-11-25 10:43</time>
+        </div>
+        <ul class="hist-notes">
+          <li>首个支持应用内更新的版本，0.1.3 用户需覆盖安装</li>
+          <li>在「偏好设置 → 通用 → 检查更新」查看当前版本与可用更新</li>
+          <li>改进确认转录页与「更多操作」菜单</li>
+        </ul>
+        <div class="hist-files">
+          <a class="hist-file" href="https://github.com/Rui333333/MONO.STT/releases/download/v0.1.4/MONO.STT_0.1.4_x64-setup.exe"><strong>Windows x64 · EXE</strong><span>95.0 MB</span></a>
+        </div>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <h2>产品与协议</h2>
+          <a href="#/index">MONO.STT 首页</a>
+          <a href="#/pricing">开源与获取</a>
+          <a href="#/docs">使用文档</a>
+          <a href="https://github.com/Rui333333/MONO.STT/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT 许可证</a>
+          <a href="#/docs/privacy">数据与隐私</a>
+        </div>
+        <div>
+          <h2>资源与支持</h2>
+          <a href="#/docs">使用文档</a>
+          <a href="#/changelog">更新日志</a>
+          <a href="#/releases">历史版本</a>
+          <a href="https://github.com/Rui333333/MONO.STT/issues" target="_blank" rel="noopener noreferrer">问题反馈</a>
+        </div>
+        <div>
+          <h2>联系我们</h2>
+          <p>Rui333333 · 开源维护者</p>
+          <a href="https://github.com/Rui333333/MONO.STT/issues" target="_blank" rel="noopener noreferrer">GitHub Issues</a>
+          <p>转录与回听在本机完成，素材不上传。</p>
+        </div>
+      </div>
+      <p class="copy">© 2026 Rui333333 · MONO.STT · MIT License</p>
+      <!-- 上线部署到国内域名时，请把下面两个链接替换为自己的 ICP / 公安备案信息 -->
+      <p class="beian"><a href="https://github.com/Rui333333/MONO.STT" target="_blank" rel="noopener noreferrer">GitHub 仓库</a><a href="https://github.com/Rui333333/MONO.STT/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">开源许可 · MIT</a></p>
+    </div>
+  </footer>
+</div>
+</template>
+<template id="page-docs">
+<div class="page-shell grid-bg">
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a href="#/index" class="brand">
+        <span class="brand-mark"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWxsZWRieT0idGl0bGUgZGVzYyI+CiAgPHRpdGxlIGlkPSJ0aXRsZSI+TU9OTy5TVFQgZmF2aWNvbjwvdGl0bGU+CiAgPGRlc2MgaWQ9ImRlc2MiPjE2cHgg5LiT55So566A5YyW56ym5Y+377ya5LiJ5qC55aOw5rOi56uW5p2h5Yqg5LiA5Liq5L+h5Y+354K577yM5Zyo5p6B5bCP5bC65a+45LiL5LuN5Y+v6L6o6K6k44CCPC9kZXNjPgogIDxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0IiBmaWxsPSIjMDkwOTBCIi8+CiAgPGcgZmlsbD0iI0ZGRkZGRiI+CiAgICA8cmVjdCB4PSIxMiIgeT0iMjQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iNCIvPgogICAgPHJlY3QgeD0iMjQiIHk9IjE2IiB3aWR0aD0iOCIgaGVpZ2h0PSIzMiIgcng9IjQiLz4KICAgIDxyZWN0IHg9IjM2IiB5PSIyMSIgd2lkdGg9IjgiIGhlaWdodD0iMjIiIHJ4PSI0Ii8+CiAgPC9nPgogIDxjaXJjbGUgY2xhc3M9InNpZ25hbC1kb3QiIGN4PSI1MCIgY3k9IjM4IiByPSI0IiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPgo=" width="32" height="32" alt=""></span> MONO.STT
+      </a>
+      <nav class="nav" aria-label="主导航">
+        <a href="#/index/features">产品</a>
+        <a href="#/pricing">开源</a>
+        <a href="#/changelog">更新日志</a>
+        <a href="#/releases">历史版本</a>
+        <a href="#/docs" class="router-link-active router-link-exact-active" aria-current="page">文档</a>
+      </nav>
+      <a href="#/index/download" class="header-download">下载</a>
+      <button class="menu-btn" type="button" aria-label="打开菜单">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+      </button>
+    </div>
+    <div class="mobile-nav wrap">
+      <a href="#/index/features">产品</a>
+      <a href="#/pricing">开源</a>
+      <a href="#/changelog">更新日志</a>
+      <a href="#/releases">历史版本</a>
+      <a href="#/docs">文档</a>
+      <a href="#/index/download">下载</a>
+    </div>
+  </header>
+
+  <main class="subpage wrap">
+    <h1>使用文档</h1>
+    <p class="lead">从安装、模型配置到校对、导出和飞书发布，按模块查阅即可。当前正式版为 0.1.7，支持 Windows x64 与 macOS 14+ Apple Silicon。</p>
+    <div class="doc-nav">
+      <aside>
+        <a href="#/docs/install">安装</a>
+        <a href="#/docs/setup">首次设置与模型</a>
+        <a href="#/docs/import">导入与转录</a>
+        <a href="#/docs/review">时间轴校对</a>
+        <a href="#/docs/export">导出与批量打包</a>
+        <a href="#/docs/feishu">飞书云文档</a>
+        <a href="#/docs/privacy">数据与隐私</a>
+        <a href="#/docs/updates">软件更新</a>
+        <a href="#/docs/build">从源码构建</a>
+        <a href="#/docs/feedback">反馈与社区</a>
+      </aside>
+      <div class="card-list">
+        <article id="install" class="card">
+          <h2>安装</h2>
+          <p>到官网下载对应平台的安装包：Windows x64 为 <code>MONO.STT_0.1.7_x64-setup.exe</code>（约 139.5 MB），macOS Apple Silicon 为 <code>MONO.STT_0.1.7_arm64.dmg</code>（约 108.2 MB）。两个安装包都内置转录引擎。</p>
+          <h3>安装步骤</h3>
+          <ul>
+            <li><strong>Windows</strong>：双击 EXE 按提示安装，可自选目录；覆盖安装沿用注册表里记录的目录。</li>
+            <li><strong>macOS</strong>：打开 DMG，把 MONO.STT 拖入「应用程序」。当前安装包尚未完成 Apple 公证，首次打开可能出现系统提示，可在 Finder 中右键选择「打开」，或到「系统设置 → 隐私与安全性」中允许。</li>
+            <li>首次启动按引导下载模型，或选择已有的模型目录，然后用内置普通话音频试转录。</li>
+          </ul>
+          <p>macOS 最低系统版本为 14；Windows 上可在「偏好设置 → 通用 → 检查更新」手动检查新版。</p>
+        </article>
+        <article id="setup" class="card">
+          <h2>首次设置与模型</h2>
+          <p>首次设置会检测本机环境，让你选择语音模型与运行设备，并做一次试转录验证。</p>
+          <h3>语音模型</h3>
+          <ul>
+            <li><strong>Whisper Large v3 Turbo</strong>：速度与精度均衡，适合中英文日常转录。</li>
+            <li><strong>Whisper Large v3</strong>：完整规模，多语种与复杂口音识别率更高。</li>
+            <li>可直接下载所需权重，或关联本机已有的模型目录；下载源可在设置中切换。</li>
+          </ul>
+          <h3>运行设备</h3>
+          <ul>
+            <li><strong>CPU</strong>：纯处理器运行，不占显存，适合无独显环境；macOS 版本使用 CPU。</li>
+            <li><strong>NVIDIA CUDA</strong>：Windows 上使用兼容的 GPU 加速推理，长音频处理更快，需要可用的 CUDA 运行库。</li>
+          </ul>
+          <p>模型目录可以在「偏好设置」中修改，模型文件始终保存在本机。</p>
+        </article>
+        <article id="import" class="card">
+          <h2>导入与转录</h2>
+          <p>导入音频或视频，即可在本机生成带时间戳的逐字稿。0.1.7 起「新建转录」直接进入导入页，应用内不再提供录音与麦克风选择。</p>
+          <ul>
+            <li>拖拽文件到窗口、使用文件选择器、导入文件夹或粘贴文件，支持批量导入。</li>
+            <li>导入的文件自动进入转录队列，转录片段逐段显示，不必等长音频全部完成。</li>
+            <li>队列中的任务可取消、重试；重启应用后会恢复上次中断的任务。</li>
+            <li>每个音视频文件可单独配置纠错词和热词，用来修正专有名词。</li>
+            <li>时间戳限制在实际音轨范围内，避免超出音频长度。</li>
+          </ul>
+        </article>
+        <article id="review" class="card">
+          <h2>时间轴校对</h2>
+          <p>转录结果可以回听、校对和修改，适合整理访谈、课程和会议记录。</p>
+          <ul>
+            <li>点击时间戳即可跳转到对应位置回听，可调整播放速度。</li>
+            <li>开启滚动跟随，播放时逐字稿自动滚动；也可随时「回到当前朗读行」。</li>
+            <li>直接编辑逐字稿中的文字并保存，修改会写回当前记录。</li>
+            <li>音频文件缺失时，点击播放会给出提示，导入原件仍保留在原位置。</li>
+          </ul>
+        </article>
+        <article id="export" class="card">
+          <h2>导出与批量打包</h2>
+          <p>单条记录可导出 <strong>TXT、Markdown 和 SRT</strong>；多条记录可一次打包成 ZIP。</p>
+          <ul>
+            <li>批量导出支持按标题或音频文件名搜索、分页浏览与跨页勾选。</li>
+            <li>可选 TXT、SRT 或两种格式一起导出，打包进同一个 ZIP，文件名默认按本地时间生成。</li>
+            <li>SRT 会带上时间轴，适合做字幕；TXT / Markdown 适合整理成文稿。</li>
+          </ul>
+        </article>
+        <article id="feishu" class="card">
+          <h2>飞书云文档</h2>
+          <p>配置飞书自建应用凭据后，可以把转录内容直接写入飞书云文档。</p>
+          <ul>
+            <li>在飞书开发者后台创建自建应用，获取 App ID 与 App Secret，并开通云文档相关权限。</li>
+            <li>填写目标文件夹链接或 token（选填）；留空时写入应用云空间。</li>
+            <li>选择写入格式后创建并写入文档；再次写入会更新同一篇文档的正文，可复制链接快速打开。</li>
+            <li>删除云文档会把已关联文档移到回收站，本地转录记录仍可查看和重新发布。</li>
+          </ul>
+          <p>只有你主动点击「发布到飞书」时才会向飞书发起请求。</p>
+        </article>
+        <article id="privacy" class="card">
+          <h2>数据与隐私</h2>
+          <p>语音识别和回听都在本机运行。下载模型、检查更新或主动发布到飞书时才需要网络。</p>
+          <ul>
+            <li><strong>Windows</strong>：转录与设置在安装目录下的 <code>data/</code>，默认模型目录为安装目录下的 <code>models/</code>。</li>
+            <li><strong>macOS</strong>：<code>~/Library/Application Support/MONO.STT/data/</code> 与 <code>~/Library/Application Support/MONO.STT/models/</code>。</li>
+            <li>转录记录保存在 <code>data/mono.db</code>，回听音轨保存在 <code>data/audio/</code>；两个平台都可在偏好设置中改模型目录。</li>
+            <li>删除转录记录会清理应用保存的配套音频，导入的原件保留在原位置。</li>
+          </ul>
+          <p>卸载应用不会自动删除上述数据；换电脑时请先备份 data 与 models 目录。</p>
+        </article>
+        <article id="updates" class="card">
+          <h2>软件更新</h2>
+          <ul>
+            <li><strong>Windows</strong>：应用启动后自动检查更新，也可在「偏好设置 → 通用 → 检查更新」手动检查。新版确认后会下载并验证签名，再由安装程序完成升级；安装时应用会关闭，请等转录队列结束。</li>
+            <li><strong>macOS</strong>：在线更新暂未启用，需要到 GitHub Releases 下载新 DMG 手动覆盖安装。</li>
+            <li>0.1.3 的用户需要手动覆盖安装 0.1.4 及以上版本，之后才能使用应用内更新。</li>
+          </ul>
+        </article>
+        <article id="build" class="card">
+          <h2>从源码构建</h2>
+          <p>项目代码采用 MIT 许可证。Windows 构建需要 PowerShell 7、Python、Rust MSVC 工具链、Visual Studio C++ 生成工具与 Windows SDK。</p>
+          <ul>
+            <li>在仓库根目录运行 <code>pwsh -File .\build-windows.ps1 -Slim</code>，安装包输出到 <code>src-tauri/target/release/bundle/windows/</code>。</li>
+            <li>macOS 使用 GitHub Actions 的「Windows and macOS packages」工作流，从同一份代码生成 EXE 与 arm64 DMG。</li>
+            <li>发布前同步 <code>tauri.conf.json</code>、<code>Cargo.toml</code> 与 <code>Cargo.lock</code> 的版本号，再打对应标签（如 <code>v0.1.7</code>）。</li>
+            <li>签名与自动更新的完整流程见仓库里的 <a href="https://github.com/Rui333333/MONO.STT/blob/main/UPDATES.md" target="_blank" rel="noopener noreferrer">UPDATES.md</a>。</li>
+          </ul>
+        </article>
+        <article id="feedback" class="card">
+          <h2>反馈与社区</h2>
+          <p>使用中遇到问题，请到 <a href="https://github.com/Rui333333/MONO.STT/issues" target="_blank" rel="noopener noreferrer">GitHub Issues</a> 提交。为了更快定位，请尽量带上：</p>
+          <ul>
+            <li>版本号（设置页「关于」里可见，当前为 0.1.7）和操作系统（如 Windows 11 x64 / macOS 14 Apple Silicon）。</li>
+            <li>复现步骤、期望结果与实际结果。</li>
+            <li>报错原文，并打码密码、App Secret、API Key 和内网地址。</li>
+          </ul>
+          <p>功能建议、文档补充和 Pull Request 同样欢迎。项目由 Rui333333 维护，代码与发布包都在 GitHub 上公开。</p>
+          <figure class="doc-qr">
+            <a href="https://github.com/Rui333333/MONO.STT" target="_blank" rel="noopener noreferrer"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWxsZWRieT0idGl0bGUgZGVzYyI+CiAgPHRpdGxlIGlkPSJ0aXRsZSI+TU9OTy5TVFQgZmF2aWNvbjwvdGl0bGU+CiAgPGRlc2MgaWQ9ImRlc2MiPjE2cHgg5LiT55So566A5YyW56ym5Y+377ya5LiJ5qC55aOw5rOi56uW5p2h5Yqg5LiA5Liq5L+h5Y+354K577yM5Zyo5p6B5bCP5bC65a+45LiL5LuN5Y+v6L6o6K6k44CCPC9kZXNjPgogIDxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgcng9IjE0IiBmaWxsPSIjMDkwOTBCIi8+CiAgPGcgZmlsbD0iI0ZGRkZGRiI+CiAgICA8cmVjdCB4PSIxMiIgeT0iMjQiIHdpZHRoPSI4IiBoZWlnaHQ9IjE2IiByeD0iNCIvPgogICAgPHJlY3QgeD0iMjQiIHk9IjE2IiB3aWR0aD0iOCIgaGVpZ2h0PSIzMiIgcng9IjQiLz4KICAgIDxyZWN0IHg9IjM2IiB5PSIyMSIgd2lkdGg9IjgiIGhlaWdodD0iMjIiIHJ4PSI0Ii8+CiAgPC9nPgogIDxjaXJjbGUgY2xhc3M9InNpZ25hbC1kb3QiIGN4PSI1MCIgY3k9IjM4IiByPSI0IiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPgo=" alt="MONO.STT 品牌图形，点击打开 GitHub 仓库" width="240" height="240"></a>
+            <figcaption>点击前往 MONO.STT 的 GitHub 仓库</figcaption>
+          </figure>
+        </article>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <h2>产品与协议</h2>
+          <a href="#/index">MONO.STT 首页</a>
+          <a href="#/pricing">开源与获取</a>
+          <a href="#/docs">使用文档</a>
+          <a href="https://github.com/Rui333333/MONO.STT/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT 许可证</a>
+          <a href="#/docs/privacy">数据与隐私</a>
+        </div>
+        <div>
+          <h2>资源与支持</h2>
+          <a href="#/docs">使用文档</a>
+          <a href="#/changelog">更新日志</a>
+          <a href="#/releases">历史版本</a>
+          <a href="https://github.com/Rui333333/MONO.STT/issues" target="_blank" rel="noopener noreferrer">问题反馈</a>
+        </div>
+        <div>
+          <h2>联系我们</h2>
+          <p>Rui333333 · 开源维护者</p>
+          <a href="https://github.com/Rui333333/MONO.STT/issues" target="_blank" rel="noopener noreferrer">GitHub Issues</a>
+          <p>转录与回听在本机完成，素材不上传。</p>
+        </div>
+      </div>
+      <p class="copy">© 2026 Rui333333 · MONO.STT · MIT License</p>
+      <!-- 上线部署到国内域名时，请把下面两个链接替换为自己的 ICP / 公安备案信息 -->
+      <p class="beian"><a href="https://github.com/Rui333333/MONO.STT" target="_blank" rel="noopener noreferrer">GitHub 仓库</a><a href="https://github.com/Rui333333/MONO.STT/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">开源许可 · MIT</a></p>
+    </div>
+  </footer>
+</div>
+</template>
+<script>
+/* MONO.STT 官网 - 交互脚本（沿用站点原有组件行为） */
+function initPage() {
+  'use strict';
+
+  var REPO = 'https://github.com/Rui333333/MONO.STT';
+  var RELEASES = REPO + '/releases';
+  var DL = RELEASES + '/download/';
+
+  /* ---------- 移动端菜单 ---------- */
+  var menuBtn = document.querySelector('.menu-btn');
+  var mobileNav = document.querySelector('.mobile-nav');
+  if (menuBtn && mobileNav) {
+    menuBtn.addEventListener('click', function () {
+      var open = mobileNav.classList.toggle('open');
+      menuBtn.setAttribute('aria-label', open ? '关闭菜单' : '打开菜单');
+    });
+    mobileNav.querySelectorAll('a').forEach(function (a) {
+      a.addEventListener('click', function () {
+        mobileNav.classList.remove('open');
+        menuBtn.setAttribute('aria-label', '打开菜单');
+      });
+    });
+  }
+
+  /* ---------- FAQ 手风琴 ---------- */
+  document.querySelectorAll('.faq').forEach(function (faq) {
+    faq.querySelectorAll('.faq-item').forEach(function (item) {
+      var btn = item.querySelector('button');
+      var body = item.querySelector('.body');
+      var sign = btn.querySelector('span');
+      btn.addEventListener('click', function () {
+        var willOpen = btn.getAttribute('aria-expanded') !== 'true';
+        faq.querySelectorAll('.faq-item').forEach(function (other) {
+          var ob = other.querySelector('button');
+          var obody = other.querySelector('.body');
+          ob.setAttribute('aria-expanded', 'false');
+          ob.querySelector('span').textContent = '+';
+          if (obody) obody.hidden = true;
+        });
+        if (willOpen) {
+          btn.setAttribute('aria-expanded', 'true');
+          sign.textContent = '−';
+          if (body) body.hidden = false;
+        }
+      });
+    });
+  });
+
+  /* ---------- 首页：转录工作流切换 ---------- */
+  var workflows = {
+    import: {
+      title: '导入转录',
+      prompt: '访谈录音.m4a · Whisper Large v3 Turbo',
+      result: '00:00:03 今天我们聊聊产品从零到一的过程……'
+    },
+    review: {
+      title: '时间轴校对',
+      prompt: '点击 00:01:12 跳转回听并修改这一句',
+      result: '00:01:12 「先把素材整理成逐字稿」→ 已校对并保存'
+    },
+    export: {
+      title: '批量导出',
+      prompt: '勾选 12 条记录，导出 TXT 与 SRT',
+      result: 'MONO.STT_导出_20261127.zip · 12 个文件 · TXT + SRT'
+    }
+  };
+  var pills = document.querySelectorAll('.pills .pill');
+  if (pills.length) {
+    var aTitle = document.querySelector('[data-agent-title]');
+    var aPrompt = document.querySelector('[data-agent-prompt]');
+    var aResult = document.querySelector('[data-agent-result]');
+    pills.forEach(function (pill) {
+      pill.addEventListener('click', function () {
+        var data = workflows[pill.dataset.agent];
+        if (!data) return;
+        pills.forEach(function (p) { p.classList.toggle('active', p === pill); });
+        aTitle.textContent = data.title;
+        aPrompt.textContent = data.prompt;
+        aResult.textContent = data.result;
+      });
+    });
+  }
+
+  /* ---------- 首页：下载卡片切换（版本 / 获取方式） ---------- */
+  var downloads = {
+    mac: {
+      latest: {
+        meta: 'v0.1.7 · DMG · 108.2 MB',
+        label: '下载 DMG 安装包',
+        url: DL + 'v0.1.7/MONO.STT_0.1.7_arm64.dmg'
+      },
+      prev: {
+        meta: 'v0.1.6 · DMG · 106.7 MB',
+        label: '下载上一版 DMG',
+        url: DL + 'v0.1.6/MONO.STT_0.1.6_arm64.dmg'
+      }
+    },
+    windows: {
+      latest: {
+        meta: 'v0.1.7 · EXE 安装版 · 139.5 MB',
+        label: '下载 EXE 安装版',
+        url: DL + 'v0.1.7/MONO.STT_0.1.7_x64-setup.exe'
+      },
+      prev: {
+        meta: 'v0.1.6 · EXE 安装版 · 139.6 MB',
+        label: '下载上一版 EXE',
+        url: DL + 'v0.1.6/MONO.STT_0.1.6_x64-setup.exe'
+      }
+    },
+    source: {
+      readme: {
+        meta: 'Rust + Python · Windows / macOS',
+        label: '查看构建说明',
+        url: REPO + '#从源码构建'
+      },
+      release: {
+        meta: '全部版本 · EXE / DMG / 签名',
+        label: '浏览 GitHub Releases',
+        url: RELEASES
+      }
+    }
+  };
+  document.querySelectorAll('.dl-card').forEach(function (card) {
+    var platform = card.dataset.card;
+    var buttons = card.querySelectorAll('.os-tabs button');
+    var meta = card.querySelector('[data-dl-meta]');
+    var dlBtn = card.querySelector('[data-dl-btn]');
+    buttons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        buttons.forEach(function (b) { b.classList.toggle('active', b === btn); });
+        var data = downloads[platform] && downloads[platform][btn.dataset.os];
+        if (!data || !meta || !dlBtn) return;
+        meta.textContent = data.meta;
+        dlBtn.textContent = data.label;
+        dlBtn.href = data.url;
+      });
+    });
+  });
+
+  /* ---------- 首页：标记当前系统 ---------- */
+  var ua = navigator.userAgent;
+  var current = /Windows/i.test(ua) ? 'windows'
+    : (/Macintosh|Mac OS X/i.test(ua)) ? 'mac' : 'source';
+  document.querySelectorAll('.dl-card').forEach(function (card) {
+    var badge = card.querySelector(':scope > p.current-badge');
+    if (badge) badge.remove();
+    card.classList.remove('current');
+    if (card.dataset.card === current) {
+      card.classList.add('current');
+      var p = document.createElement('p');
+      p.className = 'current-badge';
+      p.textContent = '当前系统';
+      card.insertBefore(p, card.firstChild);
+    }
+  });
+
+  /* ---------- 首页：快捷键 D / M ---------- */
+  if (!window.__monoKeyBound) {
+    window.__monoKeyBound = true;
+    document.addEventListener('keydown', function (e) {
+    var tag = e.target && e.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    var key = e.key.toLowerCase();
+    if (key === 'd') {
+      var d = document.getElementById('download');
+      if (d) d.scrollIntoView({ behavior: 'smooth' });
+    } else if (key === 'm') {
+      var f = document.getElementById('features');
+      if (f) f.scrollIntoView({ behavior: 'smooth' });
+    }
+    });
+  }
+
+  /* ---------- 开源页：获取方式切换（两种都免费） ---------- */
+  var billBtns = document.querySelectorAll('.bill-toggle button');
+  if (billBtns.length) {
+    var period = document.querySelector('[data-price-period]');
+    var blurb = document.querySelector('[data-price-blurb]');
+    var cta = document.querySelector('[data-price-cta]');
+    var options = {
+      year: {
+        period: 'GitHub Releases · 预编译安装包',
+        blurb: '官方安装包内置转录引擎，经过签名与冒烟验证；下载即可在 Windows 与 macOS 上使用。',
+        cta: '下载安装包',
+        href: '#/index/download'
+      },
+      life: {
+        period: 'MIT License · 从源码构建',
+        blurb: '从同一份代码生成 Windows EXE 与 macOS DMG，适合想自己控制构建、签名和模型目录的人。',
+        cta: '查看构建说明',
+        href: REPO + '#从源码构建'
+      }
+    };
+    billBtns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var opt = options[btn.dataset.bill];
+        if (!opt) return;
+        billBtns.forEach(function (b) {
+          b.classList.toggle('active', b === btn);
+          b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+        });
+        if (period) period.textContent = opt.period;
+        if (blurb) blurb.textContent = opt.blurb;
+        if (cta) {
+          cta.textContent = opt.cta;
+          cta.setAttribute('href', opt.href);
+        }
+      });
+    });
+  }
+}
+
+
+/* ---------- 单文件路由：#/<page>/<anchor> ---------- */
+var PAGE_TITLES = {"index":"MONO.STT - 本地音视频转录工具","pricing":"开源与获取 - MONO.STT","changelog":"更新日志 - MONO.STT","releases":"历史版本 - MONO.STT","docs":"使用文档 - MONO.STT"};
+var appRoot = document.getElementById('app');
+var currentPage = '';
+
+function parseRoute() {
+  var raw = location.hash.replace(/^#\/?/, '');
+  var parts = raw.split('/').filter(Boolean).map(function (s) { try { return decodeURIComponent(s); } catch (e) { return s; } });
+  var page = Object.prototype.hasOwnProperty.call(PAGE_TITLES, parts[0]) ? parts[0] : 'index';
+  return { page: page, anchor: parts[1] || '' };
+}
+
+function jump(anchor, behavior) {
+  var el = anchor && document.getElementById(anchor);
+  if (el) el.scrollIntoView({ behavior: behavior, block: 'start' });
+  else window.scrollTo({ top: 0, behavior: behavior });
+}
+
+function render() {
+  var route = parseRoute();
+  var samePage = route.page === currentPage;
+  document.title = PAGE_TITLES[route.page];
+  if (!samePage) {
+    var tpl = document.getElementById('page-' + route.page);
+    appRoot.replaceChildren(tpl.content.cloneNode(true));
+    currentPage = route.page;
+    initPage();
+  }
+  /* 切换页面立即定位；同页锚点沿用原站的平滑滚动 */
+  var behavior = samePage && route.anchor ? 'smooth' : 'instant';
+  requestAnimationFrame(function () { jump(route.anchor, behavior); });
+}
+
+window.addEventListener('hashchange', render);
+/* 重复点击同一 hash 不会触发 hashchange，手动滚动 */
+document.addEventListener('click', function (e) {
+  var a = e.target && e.target.closest ? e.target.closest('a[href^="#/"]') : null;
+  if (!a || a.getAttribute('href') !== location.hash) return;
+  e.preventDefault();
+  jump(parseRoute().anchor, 'smooth');
+});
+try { if (!location.hash) history.replaceState(null, '', '#/index'); } catch (err) {}
+render();
+
+</script>
+</body>
+</html>

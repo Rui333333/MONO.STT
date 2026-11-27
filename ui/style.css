@@ -23,7 +23,7 @@ header[data-tauri-drag-region]{padding-right:0}
 .dark .queue-card[data-selected] { background:#262626; border-color:#737373; }
 .dark .queue-action:hover, .dark .queue-remove:hover { background:#404040; color:#fafafa; }
 .mono-brand-icon{width:24px;height:auto;pointer-events:none}
-.dark .mono-brand-icon{filter:invert(1)}
+
 
 header[data-tauri-drag-region]>div:first-child,header[data-tauri-drag-region]>div:first-child>div:last-child{app-region:no-drag}
 .mono-window-controls{display:flex;align-items:stretch;height:44px;margin-left:5px;border-left:1px solid #8883}

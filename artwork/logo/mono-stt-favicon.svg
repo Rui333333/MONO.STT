@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="title desc">
+  <title id="title">MONO.STT favicon</title>
+  <desc id="desc">16px 专用简化符号：三根声波竖条加一个信号点，在极小尺寸下仍可辨认。</desc>
+  <rect x="0" y="0" width="64" height="64" rx="14" fill="#09090B"/>
+  <g fill="#FFFFFF">
+    <rect x="12" y="24" width="8" height="16" rx="4"/>
+    <rect x="24" y="16" width="8" height="32" rx="4"/>
+    <rect x="36" y="21" width="8" height="22" rx="4"/>
+  </g>
+  <circle class="signal-dot" cx="50" cy="38" r="4" fill="#FFFFFF"/>
+</svg>

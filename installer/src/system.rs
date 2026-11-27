@@ -53,6 +53,7 @@ const WEBVIEW_MACHINE: &str =
 pub const EXE: &str = "mono-stt.exe";
 pub const MAINTENANCE: &str = "mono-stt-maintenance.exe";
 pub const UNINSTALL_UI: &str = "mono-stt-uninstall-ui.exe";
+pub const APP_ICON: &str = "mono-stt-app.ico";
 
 #[derive(Clone, serde::Serialize)]
 pub struct Installed {
@@ -268,7 +269,7 @@ fn check_fresh_directory(directory: &Path, default: &Path) -> Result<(), String>
     for entry in files {
         let entry = entry.map_err(|e| e.to_string())?;
         let name = entry.file_name();
-        let known = ["data", "models", MAINTENANCE]
+        let known = ["data", "models", MAINTENANCE, APP_ICON]
             .iter()
             .any(|allowed| name == *allowed);
         // The Windows build script keeps the local updater signing material here.
@@ -497,8 +498,36 @@ pub fn shortcut(directory: &Path, desktop: bool) -> Result<(), String> {
     create_shortcut(directory, &link)?;
     if desktop {
         create_shortcut(directory, &desktop_path()?)?;
+    } else if let Ok(link) = desktop_path() {
+        if link.is_file() && shortcut_points_to(&link, &directory.join(EXE)).unwrap_or(false) {
+            create_shortcut(directory, &link)?;
+        }
     }
     Ok(())
+}
+
+pub fn refresh_shell_icons(directory: &Path) {
+    use windows_sys::Win32::UI::Shell::{
+        SHChangeNotify, SHCNE_UPDATEITEM, SHCNF_FLUSHNOWAIT, SHCNF_PATHW,
+    };
+
+    let executables = [EXE, MAINTENANCE, UNINSTALL_UI].map(|name| directory.join(name));
+    for path in executables
+        .into_iter()
+        .chain(shortcut_path().ok())
+        .chain(desktop_path().ok())
+        .filter(|path| path.is_file())
+    {
+        let path = wide(path);
+        unsafe {
+            SHChangeNotify(
+                SHCNE_UPDATEITEM as i32,
+                SHCNF_PATHW | SHCNF_FLUSHNOWAIT,
+                path.as_ptr().cast(),
+                std::ptr::null(),
+            );
+        }
+    }
 }
 
 fn desktop_path() -> Result<PathBuf, String> {
@@ -533,6 +562,9 @@ fn create_shortcut(directory: &Path, link: &Path) -> Result<(), String> {
             .map_err(|e| e.to_string())?;
         shell
             .SetWorkingDirectory(PCWSTR(wide(directory).as_ptr()))
+            .map_err(|e| e.to_string())?;
+        shell
+            .SetIconLocation(PCWSTR(wide(directory.join(APP_ICON)).as_ptr()), 0)
             .map_err(|e| e.to_string())?;
         let persist: IPersistFile = shell.cast().map_err(|e| e.to_string())?;
         persist
@@ -660,6 +692,7 @@ pub fn uninstall(directory: &Path, launcher: u32) -> Result<(), String> {
         return Err(error);
     }
     let _ = fs::remove_file(directory.join(UNINSTALL_UI));
+    let _ = fs::remove_file(directory.join(APP_ICON));
     Ok(())
 }
 
