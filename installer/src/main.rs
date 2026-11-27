@@ -324,6 +324,9 @@ fn set_page(window: tauri::WebviewWindow, page: String) -> Result<(), String> {
 fn reveal_loading(window: tauri::WebviewWindow) -> Result<(), String> {
     window.show().map_err(|error| error.to_string())?;
     let _ = window.set_focus();
+    if !window.is_focused().unwrap_or(false) {
+        let _ = window.request_user_attention(Some(tauri::UserAttentionType::Informational));
+    }
     Ok(())
 }
 

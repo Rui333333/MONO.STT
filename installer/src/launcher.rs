@@ -8,7 +8,7 @@ use std::{
     process::{self, Command},
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    IDYES, MB_ICONERROR, MB_ICONQUESTION, MB_OK, MB_YESNO,
+    AllowSetForegroundWindow, IDYES, MB_ICONERROR, MB_ICONQUESTION, MB_OK, MB_YESNO,
 };
 
 fn run() -> Result<i32, String> {
@@ -93,9 +93,15 @@ fn run() -> Result<i32, String> {
     package::copy(&mut package_file, parts.gui, &gui).map_err(|e| e.to_string())?;
     let mut command = Command::new(gui);
     command.arg("--package").arg(&setup).args(&args);
-    let status = command
-        .status()
+    let mut child = command
+        .spawn()
         .map_err(|e| format!("无法打开安装程序：{e}"))?;
+    if !silent {
+        // Pass the launcher's foreground permission to the window that will
+        // appear after WebView2 finishes initializing.
+        unsafe { AllowSetForegroundWindow(child.id()) };
+    }
+    let status = child.wait().map_err(|e| format!("无法等待安装程序：{e}"))?;
     if !status.success() && !silent {
         return Err(format!(
             "安装程序提前退出（{}）。请重新下载安装包。",

@@ -153,17 +153,65 @@ fn worker_command(app: &tauri::AppHandle) -> Result<Command, String> {
     }
 }
 
+const MEDIA_EXTENSIONS: &[&str] = &[
+    "mp4", "mov", "mkv", "webm", "avi", "m4v", "mp3", "wav", "m4a", "aac", "flac", "ogg", "opus",
+    "wma", "m4b",
+];
+
+#[tauri::command]
+async fn pick_media_folder(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+    let Some(folder) = app.dialog().file().blocking_pick_folder() else {
+        return Ok(Vec::new());
+    };
+    let mut pending = vec![folder.into_path().map_err(|e| e.to_string())?];
+    let mut files = Vec::new();
+    while let Some(dir) = pending.pop() {
+        for entry in fs::read_dir(&dir).map_err(|e| format!("无法读取 {}：{e}", dir.display()))?
+        {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let kind = entry.file_type().map_err(|e| e.to_string())?;
+            let path = entry.path();
+            #[cfg(windows)]
+            {
+                use std::os::windows::fs::MetadataExt;
+                if entry
+                    .metadata()
+                    .map_err(|e| e.to_string())?
+                    .file_attributes()
+                    & 0x400
+                    != 0
+                {
+                    continue;
+                }
+            }
+            if kind.is_dir() {
+                pending.push(path);
+            } else if kind.is_file()
+                && path
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .is_some_and(|ext| {
+                        MEDIA_EXTENSIONS
+                            .iter()
+                            .any(|known| ext.eq_ignore_ascii_case(known))
+                    })
+            {
+                files.push(path.to_string_lossy().into_owned());
+            }
+        }
+    }
+    if files.is_empty() {
+        return Err("文件夹中没有可导入的音视频文件".into());
+    }
+    files.sort();
+    Ok(files)
+}
+
 #[tauri::command]
 async fn pick_files(app: tauri::AppHandle) -> Vec<String> {
     app.dialog()
         .file()
-        .add_filter(
-            "音频和视频",
-            &[
-                "mp4", "mov", "mkv", "webm", "avi", "m4v", "mp3", "wav", "m4a", "aac", "flac",
-                "ogg", "opus", "wma", "m4b",
-            ],
-        )
+        .add_filter("音频和视频", MEDIA_EXTENSIONS)
         .blocking_pick_files()
         .unwrap_or_default()
         .into_iter()
@@ -584,6 +632,7 @@ fn main() {
             onboarding_sample,
             store::complete_onboarding,
             pick_files,
+            pick_media_folder,
             export_file,
             batch_export::export_zip,
             transcribe,
