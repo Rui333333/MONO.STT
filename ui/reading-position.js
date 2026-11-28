@@ -165,7 +165,7 @@ function useReadingAudio(React, record, notify) {
 }
 
 function createReadingTimeline(React, jsx, formatTime, DeleteIcon) {
-  const Row = React.memo(function TranscriptRow({segment, active, canRemove, readOnly, actions}) {
+  const Row = React.memo(function TranscriptRow({segment, active, canRemove, readOnly, canSeek, actions}) {
     const lines = Math.max(1, Math.ceil(segment.text.length / 44));
     return jsx('div', {
       'data-reading-row':active ? '' : undefined,
@@ -173,7 +173,7 @@ function createReadingTimeline(React, jsx, formatTime, DeleteIcon) {
       style:{'--reading-row-estimate':(lines * 22.5 + 10 + (segment.speaker ? 17 : 0)) + 'px'},
       children:[
         jsx('button', {
-          type:'button', disabled:readOnly, onClick:() => actions.current.seek(segment.startSec),
+          type:'button', disabled:!canSeek, onClick:() => actions.current.seek(segment.startSec),
           className:'reading-timestamp font-mono text-[11.5px] font-medium tabular-nums pt-1 w-11 shrink-0 text-left',
           children:formatTime(segment.startSec),
         }),
@@ -197,7 +197,7 @@ function createReadingTimeline(React, jsx, formatTime, DeleteIcon) {
     });
   });
 
-  const Group = React.memo(function TranscriptGroup({segments, activeId, canRemove, readOnly, actions, viewport}) {
+  const Group = React.memo(function TranscriptGroup({segments, activeId, canRemove, readOnly, canSeek, actions, viewport}) {
     const element = React.useRef(null);
     const measuredHeight = React.useRef(0);
     const [nearby, setNearby] = React.useState(false);
@@ -239,12 +239,12 @@ function createReadingTimeline(React, jsx, formatTime, DeleteIcon) {
         if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
       },
       children:mounted ? segments.map(segment => jsx(Row, {
-        segment, active:segment.id === activeId, canRemove, readOnly, actions,
+        segment, active:segment.id === activeId, canRemove, readOnly, canSeek, actions,
       }, segment.id)) : null,
     });
   });
 
-  return React.memo(function ReadingTimeline({segments, activeId, query, canRemove, readOnly, actions, viewport}) {
+  return React.memo(function ReadingTimeline({segments, activeId, query, canRemove, readOnly, canSeek, actions, viewport}) {
     const [groups, groupIds] = React.useMemo(() => {
       const groups = [];
       const groupIds = new Map();
@@ -259,7 +259,7 @@ function createReadingTimeline(React, jsx, formatTime, DeleteIcon) {
     const activeGroup = groupIds.get(activeId);
     return jsx('div', {className:'reading-rows', children:groups.length ?
       groups.map((group,index) => jsx(Group, {
-        segments:group, activeId:index === activeGroup ? activeId : null, canRemove, readOnly, actions, viewport,
+        segments:group, activeId:index === activeGroup ? activeId : null, canRemove, readOnly, canSeek, actions, viewport,
       }, group[0].id)) :
       jsx('p',{className:'py-10 text-center text-[13px] text-neutral-400',children:`未在正文中找到「${query}」`}),
     });

@@ -34,7 +34,7 @@ pub async fn export_zip(
     Ok(true)
 }
 
-fn filename_stem(title: &str) -> String {
+pub(crate) fn filename_stem(title: &str) -> String {
     let mut stem: String = title
         .trim()
         .chars()

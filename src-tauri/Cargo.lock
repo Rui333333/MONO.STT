@@ -2247,12 +2247,13 @@ dependencies = [
 
 [[package]]
 name = "mono-stt"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "flate2",
  "rusqlite",
  "security-framework",
  "serde_json",
+ "sha2 0.10.9",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",

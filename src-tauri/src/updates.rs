@@ -113,7 +113,11 @@ pub async fn install_app_update(
             },
         )
         .await
-        .map_err(update_error)
+        .map_err(update_error)?;
+    #[cfg(not(target_os = "windows"))]
+    app.restart();
+    #[cfg(target_os = "windows")]
+    Ok(())
 }
 
 fn update_error(error: tauri_plugin_updater::Error) -> String {

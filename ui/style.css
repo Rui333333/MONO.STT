@@ -536,3 +536,50 @@ html[data-theme-transition="expand"]::view-transition-new(root),html[data-theme-
 .media-import-action.primary:hover { opacity: .85; }
 .media-import-info { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid var(--line); padding-top: 16px; color: var(--muted); font: 11px/1.6 ui-monospace, monospace; }
 .media-import-info kbd { padding: 2px 5px; border-radius: 4px; background: var(--wash); border: 1px solid var(--line); color: var(--ink); }
+
+.queue-draft-tools{display:flex;align-items:center;flex-wrap:wrap;gap:5px 10px;font-size:12px}
+.queue-draft-tools .queue-action:disabled{opacity:.45;cursor:default}
+
+.title-update-button {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  color: inherit;
+}
+.title-update-button[hidden] { display: none; }
+.title-update-button:hover { background: color-mix(in srgb, currentColor 9%, transparent); }
+.title-update-button:focus-visible { outline: 2px solid currentColor; }
+.title-update-ring {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  position: relative;
+}
+.title-update-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(currentColor 0 78%, transparent 78%);
+  mask: radial-gradient(closest-side, transparent calc(100% - 2px), black calc(100% - 1.5px));
+}
+.title-update-button[data-progress="known"] .title-update-ring::before {
+  background: conic-gradient(currentColor 0 var(--update-progress), color-mix(in srgb, currentColor 22%, transparent) var(--update-progress) 100%);
+}
+.title-update-button[data-progress="idle"] .title-update-ring::before { display: none; }
+.title-update-ring::after {
+  content: "";
+  width: 12px;
+  height: 12px;
+  background: currentColor;
+  mask: url("update-download.svg") center / contain no-repeat;
+}
+.title-update-button[data-progress="idle"] .title-update-ring::after { width: 18px; height: 18px; }
+.title-update-button[data-progress="unknown"] .title-update-ring::before { animation: title-update-spin 1s linear infinite; }
+@keyframes title-update-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .title-update-button[data-progress="unknown"] .title-update-ring::before { animation: none; }
+}

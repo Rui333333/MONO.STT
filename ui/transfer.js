@@ -157,14 +157,14 @@ function transferReview(jsx, Dropdown, {draft, icons, onAdd, onStart, onCancel, 
 function transferJobAction(jsx, job, onCancel, onRetry) {
   const retry = queueRetryStages.has(job.stage);
   if (!retry && !['queued', 'decoding', 'inferring'].includes(job.stage)) return null;
-  const label = retry ? '重试' : '取消';
+  const label = retry ? '恢复选项' : '取消';
   return jsx('button', {
     type:'button', className:'queue-action', 'aria-label':label + ' ' + job.fileName,
     onClick:() => (retry ? onRetry : onCancel)(job.id), children:label,
   });
 }
 
-function transferJobCard(jsx, job, {selected, onOpen, onCancel, onRetry, onRemove, CloseIcon}) {
+function transferJobCard(jsx, job, {selected, onOpen, onCancel, onRemove, CloseIcon}) {
   const active = queueActiveStages.has(job.stage);
   return jsx('div', {className:'queue-card', 'data-selected':selected || undefined, children:[
     jsx('div', {className:'queue-card-top', children:[
@@ -181,24 +181,64 @@ function transferJobCard(jsx, job, {selected, onOpen, onCancel, onRetry, onRemov
     jsx('div', {className:'queue-card-status', children:[
       jsx('span', {children:queueLabels[job.stage]}),
       job.measured && active && jsx('span', {className:'font-mono tabular-nums', children:job.progress + '%'}),
-      transferJobAction(jsx, job, onCancel, onRetry),
+      transferJobAction(jsx, job, onCancel, onOpen),
     ]}),
     active && transferProgress(jsx, job.fileName, job.measured ? job.progress : undefined, true),
   ]}, job.id);
 }
 
-function transferLiveStatus(jsx, job, onCancel, onRetry) {
+function transferLiveStatus(jsx, job, onCancel, onRetry, draft, notify) {
+  const {page, go, tail, error} = draft;
+  const exportDraft = async format => {
+    try {
+      const title = job.fileName.replace(/\.[^.]+$/, '');
+      if (await desktop.invoke('draft_export', {jobId:job.id, attempt:page.attempt, title, format})) {
+        notify('部分稿已导出');
+      }
+    } catch (error) {
+      notify('导出失败：' + error);
+    }
+  };
   const active = queueActiveStages.has(job.stage);
+  const recoverable = queueRetryStages.has(job.stage);
   const label = job.stage === 'error' ? job.error
-    : job.stage === 'interrupted' ? '上次转录中断，重试将从头开始。'
-    : ['decoding', 'inferring'].includes(job.stage) ? job.message || queueLabels[job.stage]
+        : ['decoding', 'inferring'].includes(job.stage) ? job.message || queueLabels[job.stage]
     : queueLabels[job.stage];
   return jsx('div', {className:'queue-live-status', children:[
     jsx('div', {className:'queue-live-message', children:[
       jsx('span', {role:active ? undefined : 'status', children:label}),
-      transferJobAction(jsx, job, onCancel, onRetry),
+      recoverable
+        ? jsx('div', {className:'queue-draft-tools', children:[
+          page.canResume && jsx('button', {type:'button', className:'queue-action', onClick:() => onRetry(job.id, true), children:'继续转录'}),
+          jsx('button', {type:'button', className:'queue-action', onClick:() => onRetry(job.id), children:'从头转录'}),
+        ]})
+        : transferJobAction(jsx, job, onCancel),
     ]}),
+    error && jsx('p', {role:'alert', children:'读取已保存的转录稿失败：' + error}),
+    recoverable && page.resumeReason && jsx('div', {className:'queue-draft-tools', children:page.resumeReason}),
+    page.total > 0 && jsx('div', {className:'queue-draft-tools', children:[
+      jsx('span', {children:'已保存至 ' + draftTime(page.savedUntil)}),
+      jsx('button', {type:'button', className:'queue-action', onClick:() => exportDraft('srt'), children:'导出部分 SRT'}),
+      jsx('button', {type:'button', className:'queue-action', onClick:() => exportDraft('txt'), children:'导出部分 TXT'}),
+    ]}),
+    (page.start > 0 || page.start + page.segments.length < page.total || (!tail && active)) &&
+      jsx('div', {className:'queue-draft-tools', children:[
+        jsx('span', {children:`第 ${page.start + 1}–${page.start + page.segments.length} 段，共 ${page.total} 段`}),
+        jsx('button', {type:'button', className:'queue-action', disabled:page.start === 0,
+          onClick:() => go(Math.max(0, page.start - page.segments.length)), children:'看更早'}),
+        jsx('button', {type:'button', className:'queue-action', disabled:page.start + page.segments.length >= page.total,
+          onClick:() => go(page.start + page.segments.length), children:'看后续'}),
+        !tail && jsx('button', {type:'button', className:'queue-action', onClick:() => go(null), children:'回到最新'}),
+      ]}),
     (active || job.stage === 'queued') && transferProgress(jsx, job.fileName,
       job.stage === 'queued' ? 0 : job.measured ? job.progress : undefined, true),
   ]});
+}
+
+function draftTime(seconds) {
+  const time = Math.floor(seconds);
+  const part = value => String(value).padStart(2, '0');
+  const minutes = part(Math.floor(time / 60) % 60);
+  const hours = Math.floor(time / 3600);
+  return (hours ? part(hours) + ':' : '') + minutes + ':' + part(time % 60);
 }

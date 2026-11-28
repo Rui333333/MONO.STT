@@ -53,7 +53,7 @@ const state = {
   note: '',
   theme: bridge.settings.theme === 'dark' ? 'dark' : 'light',
   hardware: null, modelsDir: bridge.settings.modelsDir || '', defaultDir: '',
-  source: bridge.settings.mirrorSource || 'hf-mirror', bytes: 0, result: null
+  source: bridge.settings.mirrorSource || 'hf-mirror', bytes: 0, verifying: false, result: null
 };
 
 const $ = id => document.getElementById(id);
@@ -118,7 +118,9 @@ function viewModel() {
 
   let barLeft = '';
   if (busyModel) {
-    barLeft = `<span>${state.busyAction === 'local' ? '正在检查本地模型' : '正在下载当前文件 · ' + (state.bytes / 1048576).toFixed(1) + ' MB'}</span>`;
+    const status = state.busyAction === 'local' ? '正在校验本地模型' :
+      state.verifying ? '正在校验模型文件完整性' : '正在下载当前文件 · ' + (state.bytes / 1048576).toFixed(1) + ' MB';
+    barLeft = `<span>${status}</span>`;
   } else if (ready) {
     barLeft = `<span class="ready-flag"><span class="dot-ok"></span>${selected.name} 已校验就绪</span>`;
   } else {
@@ -372,14 +374,19 @@ $('window').addEventListener('click', async event => {
       const suffix = /[\\/](faster-whisper-large-v3(?:-turbo)?)[\\/]?$/i;
       await scanDirectory(folder.replace(suffix,''));
       state.tested = false;
-      state.note = isModelReady() ? '已找到所选模型。' : '该目录下未找到所选模型的完整文件。';
+      state.note = isModelReady() ? '已找到所选模型。' : '该目录没有通过校验的所选模型，请检查文件是否与内置版本一致。';
     } else state.note = '';
   });
   if (action === 'download') return perform('download', '正在下载模型…', async () => {
     state.bytes = 0;
+    state.verifying = false;
     state.tested = false;
     const ok = await bridge.download({model,modelsDir:state.modelsDir,source:state.source},
-      progress => { state.bytes = progress.bytes; render(); });
+      progress => {
+        state.verifying = progress.phase === 'verifying';
+        if (Number.isFinite(progress.bytes)) state.bytes = progress.bytes;
+        render();
+      });
     await scanDirectory(state.modelsDir);
     state.note = ok && isModelReady() ? '模型下载完成。' : '模型下载未完成。';
   });

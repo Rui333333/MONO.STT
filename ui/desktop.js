@@ -19,19 +19,14 @@ const desktop = (() => {
   function save(records) { return window.MonoStore.save(records); }
   async function run(job, update, ready) {
     let pending = {};
-    let segments = [];
-    let reset = false;
-    let segmentCount = 0;
     let timer;
     let closed = false;
     function flush() {
       clearTimeout(timer);
       timer = undefined;
-      if (!segments.length && !reset && !Object.keys(pending).length) return;
-      update(pending, segments, reset);
+      if (!Object.keys(pending).length) return;
+      update(pending);
       pending = {};
-      segments = [];
-      reset = false;
     }
     const events = new Channel(event => {
       if (closed) return;
@@ -49,13 +44,10 @@ const desktop = (() => {
           Object.assign(pending, {durationSec:event.duration, fileSizeBytes:event.fileSizeBytes});
           break;
         case 'reset':
-          reset = true;
-          segmentCount = 0;
-          segments = [];
           Object.assign(pending, {progress:0, measured:false});
           break;
-        case 'segment':
-          segments.push({id:job.id + '-' + segmentCount++, startSec:event.start, endSec:event.end, text:event.text});
+        case 'draft':
+          pending.draftAttempt = event.attempt;
           break;
         default:
           return;
@@ -63,11 +55,9 @@ const desktop = (() => {
       if (timer === undefined) timer = setTimeout(flush, 120);
     });
     try {
-      const r = await invoke('transcribe',{jobId:job.id,source:job.path,model:job.modelId,options:job.options,events});
-      const record = normalize({...r,name:job.fileName,created:job.createdAt,model:job.modelId});
-      /* sourcePath lets the store remove app-owned media together
-         with the WAV. External files are rejected by the Rust path guard. */
-      return {...record,sourcePath:job.path,modelName:job.modelName};
+      const record = await invoke('transcribe', {jobId:job.id, source:job.path, model:job.modelId,
+        options:job.options, fileName:job.fileName, createdAt:job.createdAt, modelName:job.modelName, resume:!!job.resume, events});
+      return {...record, audioUrl:convertFileSrc(record.audioPath)};
     } finally {
       closed = true;
       flush();
@@ -98,6 +88,8 @@ const modelLibrary = (() => {
 
   async function prepare(saved) {
     defaultDir = await invoke('default_models_dir');
+    const status = document.querySelector('.startup-status');
+    if (status) status.textContent = '正在校验本地模型…';
     try {
       startingModels = await scan(saved.modelsDir);
     } catch (error) {

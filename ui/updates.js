@@ -7,11 +7,35 @@ const MonoUpdates = (() => {
   let busy = false;
   let dialog;
 
+  let button;
+  let started = false;
+  let message = '';
+  let percent = null;
+
+  function renderButton() {
+    if (!button) return;
+    button.hidden = !available;
+    button.disabled = installing || busy;
+    button.setAttribute('aria-busy', String(installing));
+    button.dataset.progress = !installing ? 'idle' : percent === null ? 'unknown' : 'known';
+    button.style.setProperty('--update-progress', (percent ?? 0) + '%');
+    const label = installing ? message : busy ? '转录队列结束后可更新' :
+      '更新至 ' + (available?.version || '') + ' 并重启';
+    button.title = label;
+    button.setAttribute('aria-label', label);
+  }
+
+  function bindButton(node) {
+    button = node;
+    renderButton();
+  }
+
   async function check() {
     if (checking) return checking;
     checking = (async () => {
       versionInfo = await invoke('app_update_info');
       available = versionInfo?.enabled ? await invoke('check_app_update') : null;
+      renderButton();
       return available;
     })();
     try {
@@ -58,6 +82,7 @@ const MonoUpdates = (() => {
   async function open() {
     ensureDialog();
     if (dialog.open) return;
+    if (installing) { dialog.showModal(); return; }
     dialog.querySelector('[data-install]').hidden = true;
     dialog.querySelector('[data-close]').textContent = '关闭';
     dialog.querySelector('.update-notes').hidden = true;
@@ -73,6 +98,7 @@ const MonoUpdates = (() => {
 
   async function install() {
     if (!available || installing) return;
+    ensureDialog();
     if (busy) {
       status('请等转录队列结束，再安装更新。');
       return;
@@ -81,41 +107,51 @@ const MonoUpdates = (() => {
     const action = dialog.querySelector('[data-install]');
     const bar = dialog.querySelector('progress');
     installing = close.disabled = action.disabled = true;
+    percent = null;
     bar.hidden = false;
     bar.removeAttribute('value');
-    status('正在下载更新…');
+    function report(text) {
+      message = text;
+      status(text);
+      renderButton();
+    }
+    report('正在下载更新…');
     try {
       await window.MonoStore.queue;
       const progress = new Channel(event => {
         if (event.installing) {
-          status('正在验证更新并启动安装程序…');
+          percent = bar.value = 100;
+          report('正在验证更新，安装后将自动重启…');
         } else if (event.total > 0) {
-          bar.value = Math.min(100, Math.floor(event.downloaded * 100 / event.total));
-          status('正在下载更新… ' + bar.value + '%');
+          percent = bar.value = Math.min(100, Math.floor(event.downloaded * 100 / event.total));
+          report('正在下载更新… ' + bar.value + '%');
         }
       });
       await invoke('install_app_update', {version: available.version, progress});
-      status('安装程序已启动。');
+      report('正在安装并重启…');
     } catch (error) {
+      showResult();
       status(String(error));
+      if (!dialog.open) dialog.showModal();
+      // Recheck before retrying if the release changed during the download.
+      try { await check(); action.hidden = !available; } catch {}
     } finally {
       installing = close.disabled = action.disabled = false;
       bar.hidden = true;
+      renderButton();
     }
   }
 
   function start() {
-    setTimeout(async () => {
-      try {
-        if (!await check() || busy || document.querySelector('dialog[open], [aria-modal="true"]')) return;
-        ensureDialog();
-        showResult();
-        dialog.showModal();
-      } catch {
-        // Connectivity errors are reported when the user checks manually.
-      }
-    }, 2500);
+    if (started) return;
+    started = true;
+    const refresh = () => {
+      if (!installing && !dialog?.open) check().catch(() => {});
+    };
+    setTimeout(refresh, 2500);
+    setInterval(refresh, 4 * 60 * 60 * 1000);
+    window.addEventListener('online', refresh);
   }
 
-  return {open, start, setBusy: value => { busy = value; }};
+  return {open, start, install, bindButton, setBusy(value) { busy = value; renderButton(); }};
 })();

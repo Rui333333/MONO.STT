@@ -10,7 +10,7 @@ use std::{
 use tauri::{Manager, State};
 
 pub struct Store {
-    conn: Mutex<Connection>,
+    pub(crate) conn: Mutex<Connection>,
     data_dir: PathBuf,
     legacy_dir: PathBuf,
 }
@@ -44,6 +44,22 @@ CREATE TABLE IF NOT EXISTS segments (
     text       TEXT NOT NULL,
     PRIMARY KEY (record_id, position),
     FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS draft_segments (
+    job_id    TEXT NOT NULL,
+    attempt   INTEGER NOT NULL,
+    position  INTEGER NOT NULL,
+    start_sec REAL NOT NULL,
+    end_sec   REAL NOT NULL,
+    text      TEXT NOT NULL,
+    PRIMARY KEY (job_id, attempt, position)
+);
+CREATE TABLE IF NOT EXISTS draft_media (
+    job_id     TEXT NOT NULL,
+    attempt    INTEGER NOT NULL,
+    audio_path TEXT NOT NULL,
+    payload    TEXT NOT NULL,
+    PRIMARY KEY (job_id, attempt)
 );
 CREATE TABLE IF NOT EXISTS record_payload (
     id TEXT PRIMARY KEY REFERENCES records(id) ON DELETE CASCADE,
@@ -101,6 +117,7 @@ impl Store {
         for root in [&self.data_dir, &self.legacy_dir] {
             for (folder, extension) in [
                 ("audio", "wav"),
+                ("draft-audio", "wav"),
                 ("imports", "media"),
                 ("recordings", "webm"),
                 ("recordings", "wav"),
@@ -183,7 +200,7 @@ impl Store {
         tx.commit().map_err(|e| e.to_string())
     }
 
-    fn clean_pending(&self, conn: &Connection) -> Result<Vec<String>, String> {
+    pub(super) fn clean_pending(&self, conn: &Connection) -> Result<Vec<String>, String> {
         let mut statement = conn.prepare("SELECT path FROM pending_audio_delete WHERE NOT EXISTS (SELECT 1 FROM records WHERE audio_path=path OR source_path=path)").map_err(|e| e.to_string())?;
         let paths = statement
             .query_map([], |r| r.get::<_, String>(0))
@@ -245,7 +262,7 @@ fn number(record: &Value, key: &str) -> f64 {
     record.get(key).and_then(Value::as_f64).unwrap_or_default()
 }
 
-fn write_record(tx: &rusqlite::Transaction<'_>, record: &Value) -> Result<(), String> {
+pub(crate) fn write_record(tx: &rusqlite::Transaction<'_>, record: &Value) -> Result<(), String> {
     let id = text(record, "id");
     if id.is_empty() {
         return Err("记录缺少 id".into());
@@ -317,17 +334,20 @@ fn write_record(tx: &rusqlite::Transaction<'_>, record: &Value) -> Result<(), St
     Ok(())
 }
 
-fn read_all(conn: &Connection) -> Result<Value, String> {
+pub(crate) fn read_records(
+    conn: &Connection,
+    record_id: Option<&str>,
+) -> Result<Vec<Value>, String> {
     let mut statement = conn
         .prepare(
             "SELECT id, title, source_name, file_size, duration, sample_rate,
                          created_at, model_id, model_name, language, starred,
                          audio_path, source_path, waveform
-                  FROM records ORDER BY created_at DESC",
+                  FROM records WHERE ?1 IS NULL OR id = ?1 ORDER BY created_at DESC",
         )
         .map_err(|e| e.to_string())?;
     let rows = statement
-        .query_map([], |row| {
+        .query_map([record_id], |row| {
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
@@ -411,6 +431,11 @@ fn read_all(conn: &Connection) -> Result<Value, String> {
         }
         records.push(record);
     }
+    Ok(records)
+}
+
+fn read_all(conn: &Connection) -> Result<Value, String> {
+    let records = read_records(conn, None)?;
     let mut statement = conn
         .prepare("SELECT key, value FROM kv")
         .map_err(|e| e.to_string())?;
@@ -450,7 +475,8 @@ pub fn store_audio_status(
         .lock()
         .map_err(|e| e.to_string())?
         .query_row(
-            "SELECT audio_path FROM records WHERE id=?1",
+            "SELECT audio_path FROM records WHERE id=?1
+             UNION ALL SELECT audio_path FROM draft_media WHERE job_id=?1 LIMIT 1",
             [record_id],
             |row| row.get(0),
         )
@@ -524,32 +550,32 @@ fn delete_records(state: &Store, ids: Vec<String>) -> Result<Value, String> {
 }
 
 #[tauri::command]
-pub fn complete_onboarding(
-    state: State<'_, Store>,
+pub async fn complete_onboarding(
+    app: tauri::AppHandle,
     settings: Value,
     model: String,
 ) -> Result<(), String> {
-    if !crate::models::valid_model(&model)
-        || !crate::models::installed(
-            &crate::models::directory(settings["modelsDir"].as_str())?.join(&model),
-        )
-    {
-        return Err("找不到已验证的语音模型".into());
-    }
-    let mut conn = state.conn.lock().map_err(|e| e.to_string())?;
-    let tx = conn.transaction().map_err(|e| e.to_string())?;
-    for (key, value) in [
-        ("inkvoice_settings_v1", settings.to_string()),
-        ("inkvoice_active_model_v1", model),
-        ("mono_onboarding_v1", "1".into()),
-    ] {
-        tx.execute(
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = crate::models::directory(settings["modelsDir"].as_str())?.join(&model);
+        crate::models::verify_installed(&app, &path, &model)?;
+        let state = app.state::<Store>();
+        let mut conn = state.conn.lock().map_err(|e| e.to_string())?;
+        let tx = conn.transaction().map_err(|e| e.to_string())?;
+        for (key, value) in [
+            ("inkvoice_settings_v1", settings.to_string()),
+            ("inkvoice_active_model_v1", model),
+            ("mono_onboarding_v1", "1".into()),
+        ] {
+            tx.execute(
             "INSERT INTO kv VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
             params![key, value],
         )
         .map_err(|e| e.to_string())?;
-    }
-    tx.commit().map_err(|e| e.to_string())
+        }
+        tx.commit().map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -651,6 +677,123 @@ pub fn store_stats(state: State<'_, Store>) -> Result<Value, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recovers_paged_draft_and_exports_after_reopening_then_promotes_retry() {
+        use crate::drafts::{page, write_draft, Draft};
+
+        let root = tempfile::tempdir().unwrap();
+        let database = root.path().join("mono.db");
+        let open = || {
+            let conn = Connection::open(&database).unwrap();
+            conn.execute_batch(SCHEMA).unwrap();
+            Store {
+                conn: Mutex::new(conn),
+                data_dir: root.path().to_owned(),
+                legacy_dir: root.path().to_owned(),
+            }
+        };
+        {
+            let store = open();
+            let mut draft = Draft::start(&store, "job").unwrap();
+            for index in 0..231 {
+                let start = index as f64;
+                draft
+                    .append(start, start + 0.5, &format!("第 {index} 段"))
+                    .unwrap();
+            }
+        }
+        let store = open();
+        {
+            let conn = store.conn.lock().unwrap();
+            let latest = page(&conn, "job", None, None, None).unwrap();
+            assert_eq!(latest["total"], 231);
+            assert_eq!(latest["start"], 131);
+            assert_eq!(latest["savedUntil"], 230.5);
+            assert_eq!(latest["segments"].as_array().unwrap().len(), 100);
+            assert_eq!(
+                page(&conn, "job", None, None, Some((1, 131, 231))).unwrap(),
+                Value::Null
+            );
+            let first = page(&conn, "job", Some(0), None, None).unwrap();
+            assert_eq!(first["segments"][0]["text"], "第 0 段");
+            let mut output = Vec::new();
+            write_draft(&conn, "job", None, "srt", &mut output).unwrap();
+            let output = String::from_utf8(output).unwrap();
+            assert_eq!(output.matches(" --> ").count(), 231);
+            assert!(output.ends_with("231\n00:03:50,000 --> 00:03:50,500\n第 230 段\n\n"));
+            assert!(read_records(&conn, None).unwrap().is_empty());
+        }
+        let mut retry = Draft::start(&store, "job").unwrap();
+        assert!(retry.finish(&json!({"id":"job"})).is_err());
+        let attempt = retry.append(0.0, 1.0, "CUDA 部分稿").unwrap();
+        {
+            let conn = store.conn.lock().unwrap();
+            assert_eq!(
+                page(&conn, "job", None, Some(attempt), None).unwrap()["total"],
+                1
+            );
+            assert_eq!(page(&conn, "job", None, None, None).unwrap()["total"], 231);
+        }
+        retry.reset().unwrap();
+        retry.append(0.0, 2.0, "CPU 完成稿").unwrap();
+        let saved = retry
+            .finish(&json!({"id":"job","title":"访谈","sampleRate":16000}))
+            .unwrap();
+        assert_eq!(saved["segments"].as_array().unwrap().len(), 1);
+        assert_eq!(saved["segments"][0]["text"], "CPU 完成稿");
+        let conn = store.conn.lock().unwrap();
+        assert_eq!(page(&conn, "job", None, None, None).unwrap()["total"], 0);
+        assert_eq!(read_records(&conn, Some("job")).unwrap(), vec![saved]);
+    }
+
+    #[test]
+    fn resumes_the_same_attempt_from_verified_audio_and_keeps_committed_rows() {
+        use crate::drafts::{fingerprint, page, Draft};
+
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("source.mp4");
+        let audio = root.path().join("retained.wav");
+        fs::write(&source, "source").unwrap();
+        fs::write(&audio, "audio").unwrap();
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(SCHEMA).unwrap();
+        let store = Store {
+            conn: Mutex::new(conn),
+            data_dir: root.path().to_owned(),
+            legacy_dir: root.path().to_owned(),
+        };
+        let mut draft = Draft::start(&store, "job").unwrap();
+        let settings = json!({"computeDevice":"cpu", "language":"zh"});
+        draft.remember_audio(&audio, json!({
+            "source":source, "sourceStamp":fingerprint(&source).unwrap(), "options":settings,
+            "model":"faster-whisper-large-v3-turbo",
+        }), false).unwrap();
+        draft.set_language("zh").unwrap();
+        let attempt = draft.append(0.0, 10.0, "good prefix").unwrap();
+        let (mut resumed, checkpoint) =
+            Draft::resume(&store, "job", &source, "faster-whisper-large-v3-turbo").unwrap();
+        assert_eq!(checkpoint["boundary"], 10.0);
+        assert_eq!(checkpoint["options"], settings);
+        assert_eq!(checkpoint["language"], "zh");
+        assert!(Draft::resume(&store, "job", &source, "faster-whisper-large-v3").is_err());
+        resumed.reset().unwrap();
+        assert_eq!(resumed.append(9.0, 9.8, "covered").unwrap(), attempt);
+        assert_eq!(resumed.append(9.8, 11.0, "new words").unwrap(), attempt);
+        {
+            let conn = store.conn.lock().unwrap();
+            let result = page(&conn, "job", None, None, None).unwrap();
+            assert_eq!(result["total"], 2);
+            assert_eq!(result["segments"][0]["text"], "good prefix");
+            assert_eq!(result["segments"][1]["startSec"], 10.0);
+        }
+        fs::write(&source, "modified source").unwrap();
+        assert!(Draft::resume(&store, "job", &source, "faster-whisper-large-v3-turbo").is_err());
+        fs::remove_file(&source).unwrap();
+        assert!(Draft::resume(&store, "job", &source, "faster-whisper-large-v3-turbo").is_ok());
+        fs::remove_file(&audio).unwrap();
+        assert!(Draft::resume(&store, "job", &source, "faster-whisper-large-v3-turbo").is_err());
+    }
 
     #[test]
     fn migrates_and_deletes_owned_media_without_touching_imported_source() {

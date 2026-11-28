@@ -26,17 +26,18 @@ function useTranscriptionQueue(React, notify, onComplete) {
   const [jobs, setJobs] = React.useState(() => loadTranscriptionQueue(store));
   const current = React.useRef(jobs);
   const worker = React.useRef(null);
+  const removing = React.useRef(new Set());
 
   function change(next, persist = true) {
     current.current = next;
     setJobs(next);
     if (!persist) return;
-    const snapshot = next.map(({segments, measured, message, ...job}) => job);
-    store.setItem(queueStorageKey, JSON.stringify(snapshot));
+    const snapshot = next.map(({draftAttempt, measured, message, ...job}) => job);
+    return store.setItem(queueStorageKey, JSON.stringify(snapshot));
   }
 
   function patch(id, changes, persist) {
-    change(current.current.map(job => job.id === id ? {...job,...changes} : job), persist);
+    return change(current.current.map(job => job.id === id ? {...job,...changes} : job), persist);
   }
 
   async function cancelRunning(handle) {
@@ -56,26 +57,25 @@ function useTranscriptionQueue(React, notify, onComplete) {
     if (!job || worker.current) return;
     const handle = {id:job.id, stage:'decoding', ready:false};
     worker.current = handle;
-    patch(job.id, {stage:'decoding'});
+    const savedJob = patch(job.id, {stage:'decoding'});
     (async () => {
       let changes;
       try {
-        const record = await desktop.run(job, ({stage, ...data}, segments, reset) => {
+        await savedJob;
+        const record = await desktop.run(job, ({stage, ...data}) => {
           const active = current.current.find(item => item.id === handle.id);
           if (stage) handle.stage = stage;
           const nextStage = active.stage === 'cancelling' ? active.stage : handle.stage;
-          const previous = reset ? [] : active.segments || [];
-          patch(job.id, {...data, stage:nextStage,
-            segments:segments.length ? previous.concat(segments) : previous}, false);
+          patch(job.id, {...data, stage:nextStage}, false);
         }, () => {
           handle.ready = true;
           if (current.current.find(item => item.id === handle.id)?.stage === 'cancelling') {
             void cancelRunning(handle);
           }
         });
-        await store.saveTranscription(record);
+        store.rememberTranscription(record);
         onComplete(record);
-        changes = {stage:'completed', progress:100, segments:undefined, error:undefined};
+        changes = {stage:'completed', progress:100, draftAttempt:undefined, error:undefined};
         notify('转录完成：' + record.title);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -98,13 +98,27 @@ function useTranscriptionQueue(React, notify, onComplete) {
     }
   }
 
-  function retry(id) {
-    if (!current.current.some(job => job.id === id && queueRetryStages.has(job.stage))) return;
-    patch(id, {stage:'queued', progress:0, error:undefined, message:undefined, measured:false, segments:undefined});
+  function retry(id, resume = false) {
+    if (removing.current.has(id) || !current.current.some(job => job.id === id && queueRetryStages.has(job.stage))) return;
+    patch(id, {stage:'queued', resume, progress:0, error:undefined, message:undefined, measured:false, draftAttempt:undefined});
   }
 
-  function remove(id) {
-    change(current.current.filter(job => job.id !== id || (job.stage === 'queued' || queueActiveStages.has(job.stage))));
+  async function remove(id) {
+    const job = current.current.find(item => item.id === id);
+    if (!job || removing.current.has(id) || job.stage === 'queued' || queueActiveStages.has(job.stage)) return;
+    removing.current.add(id);
+    try {
+      if (queueRetryStages.has(job.stage)) {
+        const draft = await desktop.invoke('draft_page', {jobId:id});
+        if ((draft.total || draft.audioPath) && !confirm('移出队列会删除这条任务的部分稿和已保存音轨，确定继续？')) return;
+        await desktop.invoke('draft_discard', {jobId:id});
+      }
+      change(current.current.filter(item => item.id !== id));
+    } catch (error) {
+      notify('移出队列失败：' + error);
+    } finally {
+      removing.current.delete(id);
+    }
   }
 
   return {jobs, enqueue:items => change([...current.current,...items]), cancel, retry, remove};
@@ -119,6 +133,42 @@ function liveTranscriptionRecord(job) {
     modelName:job.modelName,
     fileSizeBytes:job.fileSizeBytes || 0,
     createdAt:job.createdAt,
-    segments:job.segments || emptyLiveSegments,
+    segments:emptyLiveSegments,
   };
+}
+
+const emptyDraftPage = {segments:emptyLiveSegments, start:0, total:0, savedUntil:0};
+
+function useTranscriptionDraft(React, job) {
+  const id = job?.id;
+  const active = queueActiveStages.has(job?.stage);
+  const attempt = active ? job.draftAttempt : undefined;
+  const [requested, setRequested] = React.useState(null);
+  const [snapshot, setSnapshot] = React.useState(null);
+  const start = requested?.id === id ? requested?.start : undefined;
+  const page = (snapshot?.id === id ? snapshot?.page : null) ?? emptyDraftPage;
+  const go = (position) => setRequested(position == null ? null : {id, start:position});
+  React.useEffect(() => {
+    if (!id) return;
+    let closed = false;
+    let timer;
+    let known;
+    async function read() {
+      try {
+        const page = await desktop.invoke('draft_page', {jobId:id, start, attempt, known});
+        if (closed || !page) return;
+        known = [page.attempt, page.start, page.total];
+        setSnapshot({id,page:{...page, audioUrl:page.audioPath ? window.__TAURI__.core.convertFileSrc(page.audioPath) : undefined}});
+      } catch (error) {
+        known = undefined;
+        if (!closed) setSnapshot(previous => ({id, page:previous?.id === id ? previous.page : emptyDraftPage, error:String(error)}));
+      } finally {
+        if (active && !closed) timer = setTimeout(read, 450);
+      }
+    }
+    read();
+    return () => { closed = true; clearTimeout(timer); };
+  }, [id, start, attempt, active]);
+  return {page, go, tail:start == null, pin:() => { if (start == null && page.total) go(page.start); },
+    error:snapshot?.id === id ? snapshot?.error : undefined};
 }

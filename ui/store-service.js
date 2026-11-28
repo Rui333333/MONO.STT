@@ -80,15 +80,9 @@ class MonoStoreService {
     }).catch(error => this.report(error));
   }
 
-  saveTranscription({audioUrl, ...record}) {
-    return this.enqueue(async () => {
-      if (!this.kv.libraryCreated) {
-        await this.invoke('store_kv_set', {key:'libraryCreated', value:'1'});
-        this.kv.libraryCreated = '1';
-      }
-      await this.invoke('store_save', {records:[record]});
-      this.records = [record, ...this.records.filter(item => item.id !== record.id)];
-    });
+  rememberTranscription({audioUrl, ...record}) {
+    this.kv.libraryCreated = '1';
+    this.records = [record, ...this.records.filter(item => item.id !== record.id)];
   }
 
   async deleteRecords(ids) {
@@ -107,7 +101,9 @@ class MonoStoreService {
 
   setItem(key, value) {
     this.kv[key] = String(value);
-    this.enqueue(() => this.invoke('store_kv_set',{key,value:String(value)})).catch(error => this.report(error));
+    const saved = this.enqueue(() => this.invoke('store_kv_set',{key,value:String(value)}));
+    saved.catch(error => this.report(error));
+    return saved;
   }
 }
 

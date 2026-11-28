@@ -1,6 +1,7 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 mod batch_export;
+mod drafts;
 mod feishu;
 mod models;
 mod platform;
@@ -293,6 +294,15 @@ mod transcription_tests {
     }
 }
 
+struct LiveTranscription {
+    job_id: uuid::Uuid,
+    events: Channel<Value>,
+    file_name: String,
+    created_at: String,
+    model_name: String,
+    resume: bool,
+}
+
 type ProcessHandle = Arc<Mutex<TranscriptionProcess>>;
 
 #[derive(Default)]
@@ -341,6 +351,10 @@ async fn transcribe(
     model: String,
     options: Value,
     events: Channel<Value>,
+    file_name: String,
+    created_at: String,
+    model_name: String,
+    resume: Option<bool>,
 ) -> Result<Value, String> {
     let job_id = uuid::Uuid::parse_str(&job_id).map_err(|e| e.to_string())?;
     let processes = app.state::<Transcriptions>();
@@ -361,7 +375,14 @@ async fn transcribe(
             model,
             options,
             &process,
-            Some((job_id, events)),
+            Some(LiveTranscription {
+                job_id,
+                events,
+                file_name,
+                created_at,
+                model_name,
+                resume: resume.unwrap_or(false),
+            }),
         )
     })
     .await;
@@ -373,27 +394,69 @@ fn run_worker(
     app: tauri::AppHandle,
     source: String,
     model: String,
-    options: Value,
+    mut options: Value,
     process: &Mutex<TranscriptionProcess>,
-    live: Option<(uuid::Uuid, Channel<Value>)>,
+    live: Option<LiveTranscription>,
 ) -> Result<Value, String> {
     let _task = updates::task(&app)?;
     if !models::valid_model(&model) {
         return Err("未知模型".into());
     }
-    let model_dir = models::directory(options["modelsDir"].as_str())?.join(model);
-    if !models::installed(&model_dir) {
-        return Err(format!("未找到完整的模型：{}", model_dir.display()));
-    }
-    let audio_dir = app.state::<store::Store>().data_dir().join("audio");
+    let store = app.state::<store::Store>();
+    let record_id = live.as_ref().map(|session| session.job_id.to_string());
+    let source_path = Path::new(&source);
+    let resume = live.as_ref().is_some_and(|session| session.resume);
+    let (mut draft, cached_audio) = match record_id.as_deref() {
+        Some(id) if resume => {
+            let (draft, checkpoint) = drafts::Draft::resume(&store, id, source_path, &model)?;
+            options = checkpoint["options"].clone();
+            options["_resumeAt"] = checkpoint["boundary"].clone();
+            options["_resumeText"] = checkpoint["previous"].clone();
+            options["_resumeLanguage"] = checkpoint["language"].clone();
+            (Some(draft), Some(checkpoint))
+        }
+        Some(id) => {
+            let draft = drafts::Draft::start(&store, id)?;
+            let cached = draft.cached_audio(source_path)?;
+            (Some(draft), cached)
+        }
+        None => (None, None),
+    };
+    let model_dir = models::directory(options["modelsDir"].as_str())?.join(&model);
+    models::verify_installed(&app, &model_dir, &model)?;
+    let source_stamp = if cached_audio.is_some() {
+        cached_audio
+            .as_ref()
+            .and_then(|checkpoint| checkpoint["sourceStamp"].as_str())
+            .unwrap_or_default()
+            .to_owned()
+    } else {
+        drafts::fingerprint(source_path).map_err(|error| format!("无法读取原媒体文件：{error}"))?
+    };
+    let audio_dir = store.data_dir().join(if live.is_some() {
+        "draft-audio"
+    } else {
+        "audio"
+    });
     fs::create_dir_all(&audio_dir).map_err(|e| e.to_string())?;
-    let id = uuid::Uuid::new_v4().to_string();
-    let wav = audio_dir.join(format!("{id}.wav"));
+    let wav = cached_audio
+        .as_ref()
+        .and_then(|media| media["audioPath"].as_str())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| audio_dir.join(format!("{}.wav", uuid::Uuid::new_v4())));
     let staging = wav.with_extension("transcribing");
-    let record_id = live.as_ref().map_or(id, |(job_id, _)| job_id.to_string());
+    let stored_options = options.clone();
+    if live.is_some() {
+        options["_streamSegmentsOnly"] = json!(true);
+        options["_retainedAudio"] = json!(wav);
+    }
+    if let Some(media) = &cached_audio {
+        options["_reuseAudio"] = json!(true);
+        options["_sourceSize"] = media["fileSizeBytes"].clone();
+    }
     let mut command = worker_command(&app)?;
     command
-        .arg(source)
+        .arg(&source)
         .arg(model_dir)
         .arg(&staging)
         .arg(options.to_string())
@@ -412,18 +475,77 @@ fn run_worker(
     };
     let mut result = None;
     let mut error = String::new();
+    let mut storage_error = None;
+    let mut active_attempt = None;
+    let mut audio_committed = cached_audio.is_some();
     for line in BufReader::new(stdout).lines().map_while(Result::ok) {
-        if let Ok(mut event) = serde_json::from_str::<Value>(&line) {
+        if let Ok(event) = serde_json::from_str::<Value>(&line) {
             match event["kind"].as_str() {
-                Some("result") => {
-                    event["audio"] = json!(wav);
-                    event["id"] = json!(record_id);
-                    result = Some(event);
-                }
+                Some("result") => result = Some(event),
                 Some("error") => error = event["message"].as_str().unwrap_or_default().to_string(),
-                Some("status" | "segment" | "reset" | "metadata") => {
-                    if let Some((_, channel)) = &live {
-                        let _ = channel.send(event);
+                Some("segment") => {
+                    if let (Some(draft), Some(live)) = (draft.as_mut(), &live) {
+                        let start = event["start"].as_f64().unwrap_or_default();
+                        let end = event["end"].as_f64().unwrap_or_default();
+                        let text = event["text"].as_str().unwrap_or_default();
+                        match draft.append(start, end, text) {
+                            Ok(attempt) if active_attempt != Some(attempt) => {
+                                active_attempt = Some(attempt);
+                                let _ = live
+                                    .events
+                                    .send(json!({"kind": "draft", "attempt": attempt}));
+                            }
+                            Ok(_) => {}
+                            Err(error) => {
+                                storage_error = Some(error);
+                                break;
+                            }
+                        }
+                    }
+                }
+                Some("reset" | "language" | "status" | "metadata") => {
+                    let kind = event["kind"].as_str().unwrap_or_default();
+                    if let Some(draft) = draft.as_mut() {
+                        let update = match kind {
+                            "reset" => draft.reset(),
+                            "language" => {
+                                draft.set_language(event["language"].as_str().unwrap_or_default())
+                            }
+                            "metadata" => {
+                                if !resume
+                                    && (cached_audio.is_none() || source_path.exists())
+                                    && drafts::fingerprint(source_path).ok().as_deref()
+                                        != Some(&source_stamp)
+                                {
+                                    Err("原文件在提取时发生变化，请从头转录".into())
+                                } else {
+                                    let mut media = cached_audio.clone().unwrap_or_default();
+                                    for field in ["duration", "fileSizeBytes", "waveform"] {
+                                        media[field] = event[field].clone();
+                                    }
+                                    media["source"] = json!(source);
+                                    media["sourceStamp"] = json!(source_stamp);
+                                    media["model"] = json!(model);
+                                    media["language"] = Value::Null;
+                                    media["options"] = stored_options.clone();
+                                    draft
+                                        .remember_audio(&wav, media, cached_audio.is_some())
+                                        .map(|()| {
+                                            audio_committed = true;
+                                        })
+                                }
+                            }
+                            _ => Ok(()),
+                        };
+                        if let Err(error) = update {
+                            storage_error = Some(error);
+                            break;
+                        }
+                    }
+                    if kind != "language" {
+                        if let Some(live) = &live {
+                            let _ = live.events.send(event);
+                        }
                     }
                 }
                 _ => {}
@@ -438,25 +560,41 @@ fn run_worker(
             state.child.take().expect("worker was started"),
         )
     };
+    if storage_error.is_some() {
+        let _ = child.kill();
+    }
     let status = child.wait();
+    let _ = fs::remove_file(&staging);
+    if live.is_some() && !audio_committed {
+        let _ = fs::remove_file(&wav);
+    }
+    if let Some(error) = storage_error {
+        return Err(format!("保存转录段落失败：{error}"));
+    }
     if !cancelled && status.as_ref().is_ok_and(|status| status.success()) {
         if let Some(value) = result {
-            if live.is_none() {
-                fs::remove_file(&staging).map_err(|e| e.to_string())?;
-            } else {
-                if let Err(error) = fs::rename(&staging, &wav) {
-                    let _ = fs::remove_file(&staging);
-                    return Err(error.to_string());
+            if let (Some(live), Some(draft)) = (live, draft) {
+                if !audio_committed {
+                    return Err("转录引擎未保存音轨检查点".into());
                 }
-                if let Err(error) = app.state::<store::Store>().allow_playback(&app, &wav) {
-                    let _ = fs::remove_file(&wav);
-                    return Err(error);
-                }
+                let title = live
+                    .file_name
+                    .rsplit_once('.')
+                    .filter(|(stem, ext)| !stem.is_empty() && !ext.is_empty())
+                    .map_or(live.file_name.as_str(), |(stem, _)| stem);
+                let record = json!({
+                    "id": live.job_id, "title": title, "sourceFileName": live.file_name,
+                    "fileSizeBytes": value["fileSizeBytes"], "durationSec": value["duration"],
+                    "sampleRate": 16000, "createdAt": live.created_at, "modelId": model,
+                    "modelName": live.model_name, "language": value["language"], "starred": false,
+                    "audioPath": wav, "sourcePath": source, "waveform": value["waveform"],
+                });
+                store.allow_playback(&app, &wav)?;
+                return draft.finish(&record);
             }
             return Ok(value);
         }
     }
-    let _ = fs::remove_file(staging);
     if cancelled {
         return Err(TRANSCRIPTION_CANCELLED.into());
     }
@@ -527,6 +665,7 @@ async fn init_store(app: tauri::AppHandle) -> Result<(), String> {
         if app.try_state::<store::Store>().is_none() {
             let store = store::Store::open(&app)?;
             discard_interrupted_audio(store.data_dir());
+            drafts::clean_orphans(&store)?;
             app.manage(store);
         }
         Ok(())
@@ -585,6 +724,7 @@ fn main() {
     tauri::Builder::default()
         .manage(feishu::FeishuPublish::default())
         .manage(models::ModelDownloads::default())
+        .manage(models::ModelVerifications::default())
         .manage(updates::Activity::default())
         .manage(Transcriptions::default())
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
@@ -637,6 +777,9 @@ fn main() {
             batch_export::export_zip,
             transcribe,
             cancel_transcription,
+            drafts::draft_page,
+            drafts::draft_export,
+            drafts::draft_discard,
             gpu_status,
             open_cuda_download,
             open_feishu_credentials,
