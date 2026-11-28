@@ -4,10 +4,10 @@ MONO.STT 是一款 Windows 和 macOS 桌面转录工具。导入音频或视频�
 
 ## 下载与安装
 
-| 平台 | 计算设备 | 0.1.7 安装包 |
+| 平台 | 计算设备 | 0.1.8 安装包 |
 | --- | --- | --- |
-| Windows x64 | CPU、兼容的 NVIDIA CUDA | [下载 EXE](https://github.com/Rui333333/MONO.STT/releases/download/v0.1.7/MONO.STT_0.1.7_x64-setup.exe) |
-| macOS 14 及以上，Apple Silicon（M 系列） | CPU | [下载 DMG](https://github.com/Rui333333/MONO.STT/releases/download/v0.1.7/MONO.STT_0.1.7_arm64.dmg) |
+| Windows x64 | CPU、兼容的 NVIDIA CUDA | [下载 EXE](https://github.com/Rui333333/MONO.STT/releases/download/v0.1.8/MONO.STT_0.1.8_x64-setup.exe) |
+| macOS 14 及以上，Apple Silicon（M 系列） | CPU | [下载 DMG](https://github.com/Rui333333/MONO.STT/releases/download/v0.1.8/MONO.STT_0.1.8_arm64.dmg) |
 
 - **Windows** 双击 EXE 并按提示安装。可以在「偏好设置 → 通用 → 检查更新」手动检查新版。
 - **macOS** 打开 DMG，将 MONO.STT 拖入「应用程序」。当前安装包尚未完成 Apple 公证，首次打开可能会出现系统提示。macOS 在线更新暂未启用。 [Apple 官方说明](https://support.apple.com/zh-cn/102445)
