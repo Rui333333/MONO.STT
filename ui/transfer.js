@@ -92,10 +92,15 @@ function TransferTermsDialog({React, jsx, file, onSave, onClose}) {
   });
 }
 
-function transferReview(jsx, Dropdown, {draft, icons, onAdd, onStart, onCancel, onRemove, onLanguage, language, termsEditor, onEditTerms}) {
+function transferReview(jsx, Dropdown, {draft, icons, onAdd, onStart, onCancel, onRemove, onFileOptions, termsEditor, onEditTerms}) {
   const icon = type => jsx(icons[type], {'aria-hidden':true, size:17, strokeWidth:1.7});
+  const smallIcon = path => jsx('svg', {width:14, height:14, viewBox:'0 0 24 24',
+    fill:'none', stroke:'currentColor', strokeWidth:1.7, strokeLinecap:'round',
+    strokeLinejoin:'round', 'aria-hidden':true, children:jsx('path',{d:path})});
+  const sparkle = smallIcon('M9.9 18.4 12 22l2.1-3.6a8 8 0 0 1 4.3-4.3L22 12l-3.6-2.1a8 8 0 0 1-4.3-4.3L12 2 9.9 5.6a8 8 0 0 1-4.3 4.3L2 12l3.6 2.1a8 8 0 0 1 4.3 4.3Z');
+  const braces = smallIcon('M8 3H7a2 2 0 0 0-2 2v4a3 3 0 0 1-3 3 3 3 0 0 1 3 3v4a2 2 0 0 0 2 2h1m8-18h1a2 2 0 0 1 2 2v4a3 3 0 0 0 3 3 3 3 0 0 0-3 3v4a2 2 0 0 1-2 2h-1');
   const languages = [
-    ['auto','自动识别'], ['zh','中文'], ['en','英语'], ['ja','日语'], ['zh-en','中英混合'],
+    ['auto','自动识别'], ['zh','中文'], ['en','English'], ['ja','日语'], ['zh-en','中英混合'],
   ].map(([value,label]) => ({value,label}));
   const audioExtensions = /^(mp3|wav|m4a|aac|flac|ogg|opus|wma|m4b)$/i;
   return jsx('section', {className:'transfer-page transfer-review', 'aria-labelledby':'transfer-review-heading', children:[
@@ -103,21 +108,17 @@ function transferReview(jsx, Dropdown, {draft, icons, onAdd, onStart, onCancel, 
     jsx('div', {className:'transfer-review-body', children:[
       jsx('div', {className:'transfer-review-title', children:[
         jsx('h2', {id:'transfer-review-heading', children:'待转录文件'}),
-        jsx('p', {'aria-live':'polite', children:draft.length + ' 个文件'}),
+        jsx('p', {'aria-live':'polite', children:draft.length + ' 个文件待处理'}),
       ]}),
       jsx('div', {className:'transfer-review-tools', children:[
         jsx('h3', {id:'transfer-file-heading', children:'文件清单'}),
         jsx('div', {className:'transfer-review-controls', children:[
-          jsx('div', {className:'transfer-language', children:[
-            jsx('span', {'aria-hidden':true, children:'语种'}),
-            jsx(Dropdown, {label:'语种', value:language, onChange:onLanguage, items:languages}),
-          ]}),
           jsx('button', {type:'button', className:'transfer-review-button transfer-review-add',
             onClick:onAdd, children:[icon('add'), '添加文件']}),
         ]}),
       ]}),
       draft.length ? jsx('ul', {className:'transfer-file-list', 'aria-labelledby':'transfer-file-heading',
-        children:draft.map(({name,path,terms}) => {
+        children:draft.map(({name,path,terms,options}) => {
           const dot = name.lastIndexOf('.');
           const extension = dot > 0 ? name.slice(dot + 1) : '';
           const separator = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
@@ -125,13 +126,28 @@ function transferReview(jsx, Dropdown, {draft, icons, onAdd, onStart, onCancel, 
           return jsx('li', {className:'transfer-file', children:[
             jsx('span', {className:'transfer-file-icon', children:icon(audioExtensions.test(extension) ? 'audio' : 'video')}),
             jsx('div', {className:'transfer-file-detail', children:[
-              jsx('strong', {title:name, children:name}),
-              jsx('span', {title:path, children:directory}),
+              jsx('div', {className:'transfer-file-name', children:[
+                jsx('strong', {title:name, children:name}),
+                extension && jsx('span', {className:'transfer-file-extension', children:extension.toUpperCase()}),
+              ]}),
+              jsx('span', {className:'transfer-file-path', title:path, children:directory}),
             ]}),
-            jsx('span', {className:'transfer-file-extension', 'aria-hidden':true, children:extension.toUpperCase()}),
-            jsx('button', {type:'button', className:'transfer-review-button transfer-file-terms',
-              'aria-label':'词语纠正 ' + name, 'aria-haspopup':'dialog', onClick:()=>onEditTerms(path),
-              children:terms?.length ? `词语纠正 · ${terms.length}` : '词语纠正'}),
+            jsx('div', {className:'transfer-file-controls', children:[
+              jsx(Dropdown, {label:'语种 · ' + name, value:options.language, items:languages,
+                trigger:[
+                  jsx('span',{className:'transfer-language-label','aria-hidden':true,children:'语种'}),
+                  jsx('span',{className:'mono-dropdown-label',children:languages.find(item => item.value === options.language)?.label || '自动识别'}),
+                ],
+                minWidth:120, onChange:language=>onFileOptions(path,{language})}),
+              jsx('button', {type:'button', className:'transfer-review-button transfer-file-terms',
+                'aria-label':'词语纠正 ' + name, 'aria-haspopup':'dialog', onClick:()=>onEditTerms(path),
+                children:[sparkle, terms?.length ? `词语纠正 · ${terms.length}` : '词语纠正']}),
+              jsx('button', {type:'button', className:'transfer-review-button transfer-file-json',
+                'aria-pressed':options.characterJson, 'aria-label':'生成逐字 JSON · ' + name,
+                title:'转录完成后为此文件保存逐字 JSON',
+                onClick:()=>onFileOptions(path,{characterJson:!options.characterJson}),
+                children:[braces, '逐字 JSON']}),
+            ]}),
             jsx('button', {type:'button', className:'transfer-review-button transfer-file-remove',
               title:'移除文件', 'aria-label':'移除 ' + name, onClick:event=>{
                 const row = event.currentTarget.closest('li');
@@ -147,7 +163,7 @@ function transferReview(jsx, Dropdown, {draft, icons, onAdd, onStart, onCancel, 
       jsx('div', {className:'transfer-review-actions', children:[
         jsx('button', {type:'button', className:'transfer-review-button', onClick:onCancel, children:'取消'}),
         jsx('button', {type:'button', className:'transfer-review-button transfer-review-start',
-          disabled:!draft.length, onClick:onStart, children:'开始转录'}),
+          disabled:!draft.length, onClick:onStart, children:draft.length ? `开始转录 (${draft.length})` : '开始转录'}),
       ]}),
     }),
     termsEditor,

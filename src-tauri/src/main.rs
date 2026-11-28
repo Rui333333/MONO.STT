@@ -230,6 +230,25 @@ async fn export_file(app: tauri::AppHandle, name: String, content: String) -> Re
     Ok(true)
 }
 
+#[tauri::command]
+async fn save_character_json(id: String, title: String, content: String) -> Result<PathBuf, String> {
+    let id = uuid::Uuid::parse_str(&id).map_err(|_| "无效的转录记录 ID")?;
+    tauri::async_runtime::spawn_blocking(move || {
+        use std::io::Write;
+
+        let directory = platform::data_root()?.join("data").join("exports");
+        fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+        let stem = batch_export::filename_stem(&title);
+        let path = directory.join(format!("{stem}-{id}.characters.json"));
+        let mut temporary = tempfile::NamedTempFile::new_in(&directory).map_err(|error| error.to_string())?;
+        temporary.write_all(content.as_bytes()).map_err(|error| error.to_string())?;
+        temporary.persist(&path).map_err(|error| error.to_string())?;
+        Ok(path)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
 const TRANSCRIPTION_CANCELLED: &str = "TRANSCRIPTION_CANCELLED";
 
 #[derive(Default)]
@@ -488,7 +507,7 @@ fn run_worker(
                         let start = event["start"].as_f64().unwrap_or_default();
                         let end = event["end"].as_f64().unwrap_or_default();
                         let text = event["text"].as_str().unwrap_or_default();
-                        match draft.append(start, end, text) {
+                        match draft.append_details(start, end, text, &event["words"]) {
                             Ok(attempt) if active_attempt != Some(attempt) => {
                                 active_attempt = Some(attempt);
                                 let _ = live
@@ -774,6 +793,7 @@ fn main() {
             pick_files,
             pick_media_folder,
             export_file,
+            save_character_json,
             batch_export::export_zip,
             transcribe,
             cancel_transcription,

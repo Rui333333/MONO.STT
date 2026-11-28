@@ -294,7 +294,12 @@ impl<'a> Draft<'a> {
         Ok(())
     }
 
+    #[cfg(test)]
     pub fn append(&mut self, start: f64, end: f64, text: &str) -> Result<i64, String> {
+        self.append_details(start, end, text, &Value::Null)
+    }
+
+    pub fn append_details(&mut self, start: f64, end: f64, text: &str, words: &Value) -> Result<i64, String> {
         let start = if self.resumed {
             start.max(self.last_end).max(self.boundary)
         } else {
@@ -304,7 +309,7 @@ impl<'a> Draft<'a> {
             return Ok(self.attempt);
         }
         let conn = self.store.conn.lock().map_err(|e| e.to_string())?;
-        conn.prepare_cached("INSERT INTO draft_segments VALUES (?1, ?2, ?3, ?4, ?5, ?6)")
+        conn.prepare_cached("INSERT INTO draft_segments (job_id, attempt, position, start_sec, end_sec, text, words) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)")
             .and_then(|mut statement| {
                 statement.execute(params![
                     self.id,
@@ -312,7 +317,8 @@ impl<'a> Draft<'a> {
                     self.position,
                     start,
                     end,
-                    text
+                    text,
+                    if words.is_array() { words.to_string() } else { "[]".to_owned() },
                 ])
             })
             .map_err(|e| e.to_string())?;
@@ -331,8 +337,8 @@ impl<'a> Draft<'a> {
         tx.execute("DELETE FROM record_payload WHERE id = ?1", [self.id])
             .map_err(|e| e.to_string())?;
         tx.execute(
-            "INSERT INTO segments (record_id, position, start_sec, end_sec, text)
-             SELECT job_id, position, start_sec, end_sec, text
+            "INSERT INTO segments (record_id, position, start_sec, end_sec, text, words)
+             SELECT job_id, position, start_sec, end_sec, text, words
              FROM draft_segments WHERE job_id = ?1 AND attempt = ?2",
             params![self.id, self.attempt],
         )
@@ -396,7 +402,7 @@ pub(super) fn page(
         return Ok(Value::Null);
     }
     let mut statement = conn.prepare_cached(
-        "SELECT position, start_sec, end_sec, text FROM draft_segments
+        "SELECT position, start_sec, end_sec, text, words FROM draft_segments
          WHERE job_id = ?1 AND attempt = ?2 AND position >= ?3 ORDER BY position LIMIT ?4",
     )?;
     let segments = statement
@@ -404,7 +410,8 @@ pub(super) fn page(
             let position: i64 = row.get(0)?;
             Ok(
                 json!({"id":format!("{id}-{attempt}-{position}"), "startSec":row.get::<_, f64>(1)?,
-                  "endSec":row.get::<_, f64>(2)?, "text":row.get::<_, String>(3)?}),
+                  "endSec":row.get::<_, f64>(2)?, "text":row.get::<_, String>(3)?,
+                  "words":serde_json::from_str::<Value>(&row.get::<_, String>(4)?).unwrap_or_else(|_| json!([]))}),
             )
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;

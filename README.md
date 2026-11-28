@@ -4,10 +4,10 @@ MONO.STT 是一款 Windows 和 macOS 桌面转录工具。导入音频或视频�
 
 ## 下载与安装
 
-| 平台 | 计算设备 | 0.1.8 安装包 |
+| 平台 | 计算设备 | 0.1.9 安装包 |
 | --- | --- | --- |
-| Windows x64 | CPU、兼容的 NVIDIA CUDA | [下载 EXE](https://github.com/Rui333333/MONO.STT/releases/download/v0.1.8/MONO.STT_0.1.8_x64-setup.exe) |
-| macOS 14 及以上，Apple Silicon（M 系列） | CPU | [下载 DMG](https://github.com/Rui333333/MONO.STT/releases/download/v0.1.8/MONO.STT_0.1.8_arm64.dmg) |
+| Windows x64 | CPU、兼容的 NVIDIA CUDA | [下载 EXE](https://github.com/Rui333333/MONO.STT/releases/download/v0.1.9/MONO.STT_0.1.9_x64-setup.exe) |
+| macOS 14 及以上，Apple Silicon（M 系列） | CPU、Apple Metal | [下载 DMG](https://github.com/Rui333333/MONO.STT/releases/download/v0.1.9/MONO.STT_0.1.9_arm64.dmg) |
 
 - **Windows** 双击 EXE 并按提示安装。可以在「偏好设置 → 通用 → 检查更新」手动检查新版。
 - **macOS** 打开 DMG，将 MONO.STT 拖入「应用程序」。当前安装包尚未完成 Apple 公证，首次打开可能会出现系统提示。macOS 在线更新暂未启用。 [Apple 官方说明](https://support.apple.com/zh-cn/102445)
@@ -62,3 +62,9 @@ Windows 发布、代码签名和自动更新配置见 [UPDATES.md](UPDATES.md)�
 ## 许可证
 
 MONO.STT 项目代码使用 [MIT License](LICENSE)。第三方依赖、字体和模型权重适用各自的许可证。
+
+
+## 0.1.9 的本地模型配置
+
+- **Apple Metal**。在偏好设置中选择 Apple Metal，并在 CTranslate2 模型目录旁创建同名加 `-mlx` 的目录。Turbo 使用 [MLX Turbo 固定版本](https://huggingface.co/mlx-community/whisper-large-v3-turbo/tree/a4aaeec0636e6fef84abdcbe3544cb2bf7e9f6fb) 的 `config.json` 和 `weights.safetensors`。Large v3 使用 [MLX Large v3 固定版本](https://huggingface.co/mlx-community/whisper-large-v3-mlx/tree/49e6aa286ad60c14352c404340ded53710378a11) 的 `config.json` 和 `weights.npz`。Metal 推理和 CPU 推理使用各自的权重格式。导入后会比对文件大小与 SHA-256。
+- **逐字播放**。在时间轴点击汉字可跳到对应时间。中文模型词本身覆盖多个汉字时，应用在该词的时间范围内分配字的位置。手工校对后，改动段落使用段落级播放定位。

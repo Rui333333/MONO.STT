@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS segments (
     start_sec  REAL NOT NULL,
     end_sec    REAL NOT NULL,
     text       TEXT NOT NULL,
+    words TEXT NOT NULL DEFAULT '[]',
     PRIMARY KEY (record_id, position),
     FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE
 );
@@ -52,6 +53,7 @@ CREATE TABLE IF NOT EXISTS draft_segments (
     start_sec REAL NOT NULL,
     end_sec   REAL NOT NULL,
     text      TEXT NOT NULL,
+    words TEXT NOT NULL DEFAULT '[]',
     PRIMARY KEY (job_id, attempt, position)
 );
 CREATE TABLE IF NOT EXISTS draft_media (
@@ -72,6 +74,21 @@ CREATE TABLE IF NOT EXISTS kv (
 );
 ";
 
+fn migrate_segment_details(conn: &Connection) -> rusqlite::Result<()> {
+    let tx = conn.unchecked_transaction()?;
+    for table in ["segments", "draft_segments"] {
+        let exists: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM pragma_table_info(?1) WHERE name = 'words')",
+            [table],
+            |row| row.get(0),
+        )?;
+        if !exists {
+            tx.execute_batch(&format!("ALTER TABLE {table} ADD COLUMN words TEXT NOT NULL DEFAULT '[]'"))?;
+        }
+    }
+    tx.commit()
+}
+
 impl Store {
     pub fn open(app: &tauri::AppHandle) -> Result<Self, String> {
         let legacy_dir = app.path().app_local_data_dir().map_err(|e| e.to_string())?;
@@ -87,6 +104,7 @@ impl Store {
         }
         let conn = Connection::open(database).map_err(|e| e.to_string())?;
         conn.execute_batch(SCHEMA).map_err(|e| e.to_string())?;
+        migrate_segment_details(&conn).map_err(|e| e.to_string())?;
         let store = Self {
             conn: Mutex::new(conn),
             data_dir,
@@ -317,14 +335,15 @@ pub(crate) fn write_record(tx: &rusqlite::Transaction<'_>, record: &Value) -> Re
         .unwrap_or_default();
     for (position, segment) in segments.iter().enumerate() {
         tx.execute(
-            "INSERT INTO segments (record_id, position, start_sec, end_sec, text)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+            "INSERT INTO segments (record_id, position, start_sec, end_sec, text, words)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 id,
                 position as i64,
                 number(segment, "startSec"),
                 number(segment, "endSec"),
                 text(segment, "text"),
+                segment.get("words").filter(|words| words.is_array()).map_or_else(|| "[]".to_owned(), Value::to_string),
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -384,7 +403,7 @@ pub(crate) fn read_records(
         let id = r.0.clone();
         let mut segment_stmt = conn
             .prepare(
-                "SELECT start_sec, end_sec, text FROM segments
+                "SELECT start_sec, end_sec, text, words FROM segments
                  WHERE record_id = ?1 ORDER BY position",
             )
             .map_err(|e| e.to_string())?;
@@ -394,17 +413,19 @@ pub(crate) fn read_records(
                     row.get::<_, f64>(0)?,
                     row.get::<_, f64>(1)?,
                     row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
                 ))
             })
             .map_err(|e| e.to_string())?
             .filter_map(Result::ok)
             .enumerate()
-            .map(|(index, (start, end, content))| {
+            .map(|(index, (start, end, content, words))| {
                 json!({
                     "id": format!("{}-{}", id, index),
                     "startSec": start,
                     "endSec": end,
                     "text": content,
+                    "words": serde_json::from_str::<Value>(&words).unwrap_or_else(|_| json!([])),
                 })
             })
             .collect();
@@ -679,6 +700,23 @@ mod tests {
     use super::*;
 
     #[test]
+    fn upgrades_legacy_segments_without_discarding_text() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE segments (text TEXT); INSERT INTO segments VALUES ('legacy');
+             CREATE TABLE draft_segments (text TEXT); INSERT INTO draft_segments VALUES ('draft');",
+        ).unwrap();
+        migrate_segment_details(&conn).unwrap();
+        migrate_segment_details(&conn).unwrap();
+        for (table, expected) in [("segments", "legacy"), ("draft_segments", "draft")] {
+            let row = conn.query_row(&format!("SELECT text, words FROM {table}"), [], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            }).unwrap();
+            assert_eq!(row, (expected.to_owned(), "[]".to_owned()));
+        }
+    }
+
+    #[test]
     fn recovers_paged_draft_and_exports_after_reopening_then_promotes_retry() {
         use crate::drafts::{page, write_draft, Draft};
 
@@ -770,7 +808,8 @@ mod tests {
             "model":"faster-whisper-large-v3-turbo",
         }), false).unwrap();
         draft.set_language("zh").unwrap();
-        let attempt = draft.append(0.0, 10.0, "good prefix").unwrap();
+        let words = json!([{"text":"good prefix", "startSec":0.0, "endSec":10.0}]);
+        let attempt = draft.append_details(0.0, 10.0, "good prefix", &words).unwrap();
         let (mut resumed, checkpoint) =
             Draft::resume(&store, "job", &source, "faster-whisper-large-v3-turbo").unwrap();
         assert_eq!(checkpoint["boundary"], 10.0);
@@ -785,6 +824,7 @@ mod tests {
             let result = page(&conn, "job", None, None, None).unwrap();
             assert_eq!(result["total"], 2);
             assert_eq!(result["segments"][0]["text"], "good prefix");
+            assert_eq!(result["segments"][0]["words"], words);
             assert_eq!(result["segments"][1]["startSec"], 10.0);
         }
         fs::write(&source, "modified source").unwrap();
@@ -793,6 +833,8 @@ mod tests {
         assert!(Draft::resume(&store, "job", &source, "faster-whisper-large-v3-turbo").is_ok());
         fs::remove_file(&audio).unwrap();
         assert!(Draft::resume(&store, "job", &source, "faster-whisper-large-v3-turbo").is_err());
+        let complete = resumed.finish(&json!({"id":"job","title":"Recorded"})).unwrap();
+        assert_eq!(complete["segments"][0]["words"], words);
     }
 
     #[test]
@@ -828,7 +870,7 @@ mod tests {
                 ("c", &legacy_recording),
             ] {
                 let mut record = json!({"id":id,"audioPath":legacy_audio,"sourcePath":source,
-                    "notes":"keep these notes","segments":[{"id":"seg","text":"test","speaker":"A"}]});
+                    "notes":"keep these notes","segments":[{"id":"seg","text":"test"}]});
                 store.relocate_record(&tx, &mut record).unwrap();
                 write_record(&tx, &record).unwrap();
             }
@@ -836,7 +878,7 @@ mod tests {
             assert!(store.clean_pending(&conn).unwrap().is_empty());
             let snapshot = read_all(&conn).unwrap();
             assert_eq!(snapshot["records"][0]["notes"], "keep these notes");
-            assert_eq!(snapshot["records"][0]["segments"][0]["speaker"], "A");
+            assert_eq!(snapshot["records"][0]["segments"][0]["text"], "test");
         }
         let relocated = store.data_dir.join("audio").join(format!("{id}.wav"));
         let relocated_recording = store.data_dir.join("recordings").join(format!("{id}.wav"));

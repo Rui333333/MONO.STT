@@ -14,9 +14,9 @@ pub async fn export_zip(
     if entries.is_empty()
         || entries
             .iter()
-            .any(|(_, ext, _)| !matches!(ext.as_str(), "srt" | "txt"))
+            .any(|(_, ext, _)| !matches!(ext.as_str(), "srt" | "txt" | "json"))
     {
-        return Err("请选择转录记录和 SRT 或 TXT 格式".into());
+        return Err("请选择转录记录和 SRT、TXT 或逐字 JSON 格式".into());
     }
     let Some(path) = app
         .dialog()

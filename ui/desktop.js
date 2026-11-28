@@ -81,7 +81,7 @@ const modelLibrary = (() => {
       saved.modelsDir.toLowerCase() === 'd:\\aimodel') ? '' : saved.modelsDir;
     return {
       ...saved, modelsDir, modelDirectoryVersion: 1,
-      ...(monoMacOS ? {computeDevice:'cpu'} : {}),
+      ...(monoMacOS && saved.computeDevice !== 'metal' ? {computeDevice:'cpu'} : {}),
       mirrorSource: saved.mirrorSource === 'huggingface' ? 'huggingface' : 'hf-mirror',
     };
   }

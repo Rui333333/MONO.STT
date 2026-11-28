@@ -2,6 +2,27 @@ name: Build macOS Apple Silicon package
 
 on:
   workflow_call:
+    inputs:
+      release:
+        type: boolean
+        default: false
+    secrets:
+      APPLE_CERTIFICATE:
+        required: false
+      APPLE_CERTIFICATE_PASSWORD:
+        required: false
+      APPLE_SIGNING_IDENTITY:
+        required: false
+      APPLE_API_KEY:
+        required: false
+      APPLE_API_ISSUER:
+        required: false
+      APPLE_API_KEY_P8:
+        required: false
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: false
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+        required: false
 
 permissions:
   contents: read
@@ -26,22 +47,56 @@ jobs:
       - name: Prepare the embedded transcriber
         run: |
           test "$(uname -m)" = arm64
-          python -m pip install --only-binary=:all: 'pyinstaller>=6.11,<7' 'faster-whisper==1.2.1' 'ctranslate2==4.9.1' 'av==16.1.0'
+          python -m pip install --only-binary=:all: 'pyinstaller>=6.11,<7' 'faster-whisper==1.2.1' 'ctranslate2==4.9.1' 'av==16.1.0' 'mlx-whisper==0.4.3' 'opencc-python-reimplemented==0.1.7'
           python -m PyInstaller --noconfirm --clean --onedir --target-architecture arm64 \
             --name mono-stt-worker --distpath "$RUNNER_TEMP/worker" --workpath "$RUNNER_TEMP/pyinstaller" \
             --specpath "$RUNNER_TEMP" --collect-all av --collect-all ctranslate2 \
-            --collect-all onnxruntime --collect-data faster_whisper --copy-metadata faster-whisper \
+            --collect-all mlx --collect-all opencc --collect-all onnxruntime --collect-data faster_whisper --copy-metadata faster-whisper \
             backend/transcribe.py
           "$RUNNER_TEMP/worker/mono-stt-worker/mono-stt-worker" --probe-runtime
-      - name: Build the desktop application
+      - name: Configure Developer ID signing
+        if: inputs.release
+        env:
+          CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          API_KEY_ID: ${{ secrets.APPLE_API_KEY }}
+          API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          API_PRIVATE_KEY: ${{ secrets.APPLE_API_KEY_P8 }}
         run: |
+          set -euo pipefail
+          : "${CERTIFICATE:?}" "${PASSWORD:?}" "${SIGNING_IDENTITY:?}" "${API_KEY_ID:?}" "${API_ISSUER:?}" "${API_PRIVATE_KEY:?}"
+          umask 077
+          printf '%s' "$CERTIFICATE" | base64 -D > "$RUNNER_TEMP/signing.p12"
+          printf '%s' "$API_PRIVATE_KEY" > "$RUNNER_TEMP/notary.p8"
+          keychain="$RUNNER_TEMP/mono-signing.keychain-db"
+          secret=$(openssl rand -hex 24)
+          security create-keychain -p "$secret" "$keychain"
+          security unlock-keychain -p "$secret" "$keychain"
+          security list-keychains -d user -s "$keychain"
+          security import "$RUNNER_TEMP/signing.p12" -k "$keychain" -P "$PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$secret" "$keychain"
+          printf 'MONO_APPLE_IDENTITY=%s\nMONO_APPLE_KEY=%s\nMONO_APPLE_ISSUER=%s\n' "$SIGNING_IDENTITY" "$API_KEY_ID" "$API_ISSUER" >> "$GITHUB_ENV"
+      - name: Build the desktop application
+        env:
+          MONO_SIGNED_UPDATE_BUILD: ${{ inputs.release && '1' || '' }}
+        run: |
+          node --test tests/character-json.test.mjs
+          python -B -m unittest discover -s backend -p "test_*.py"
           cargo test --release --locked --manifest-path src-tauri/Cargo.toml
           npm exec --yes --package=@tauri-apps/cli@2.12.6 -- tauri build --bundles app -- --locked
       - name: Create the DMG
         run: |
           app="src-tauri/target/release/bundle/macos/MONO.STT.app"
           ditto "$RUNNER_TEMP/worker/mono-stt-worker" "$app/Contents/Resources/runtime"
-          codesign --force --sign - "$app"
+          if [[ -n "${MONO_APPLE_IDENTITY:-}" ]]; then
+            codesign --force --deep --options runtime --timestamp --sign "$MONO_APPLE_IDENTITY" "$app"
+            ditto -c -k --keepParent "$app" "$RUNNER_TEMP/notary.zip"
+            xcrun notarytool submit "$RUNNER_TEMP/notary.zip" --key "$RUNNER_TEMP/notary.p8" --key-id "$MONO_APPLE_KEY" --issuer "$MONO_APPLE_ISSUER" --wait
+            xcrun stapler staple "$app"
+          else
+            codesign --force --sign - "$app"
+          fi
           codesign --verify --deep --strict "$app"
           version=$(python -c 'import json; print(json.load(open("src-tauri/tauri.conf.json"))["version"])')
           stage="$RUNNER_TEMP/dmg-stage"
@@ -49,6 +104,18 @@ jobs:
           ditto "$app" "$stage/MONO.STT.app"
           ln -s /Applications "$stage/Applications"
           hdiutil create -ov -volname 'MONO.STT' -srcfolder "$stage" -format UDZO "dist-macos/MONO.STT_${version}_arm64.dmg"
+      - name: Sign the macOS updater archive
+        if: inputs.release
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          : "${TAURI_SIGNING_PRIVATE_KEY:?}"
+          version=$(python -c 'import json; print(json.load(open("src-tauri/tauri.conf.json"))["version"])')
+          archive="dist-macos/MONO.STT_${version}_arm64.app.tar.gz"
+          tar -czf "$archive" -C src-tauri/target/release/bundle/macos MONO.STT.app
+          npm exec --yes --package=@tauri-apps/cli@2.12.6 -- tauri signer sign --app-version "$version" "$archive"
       - name: Verify the packaged app and CPU transcription
         run: |
           mount="$RUNNER_TEMP/mono-mount"
@@ -68,5 +135,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: MONO.STT-macOS-arm64
-          path: dist-macos/*.dmg
+          path: dist-macos/
           if-no-files-found: error

@@ -36,8 +36,13 @@ pwsh -File .\build-windows.ps1 -Slim -Signed -WindowsSignScript C:\Signing\sign.
 
 同步更新 `src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 和 `src-tauri/Cargo.lock` 内的应用版本。将版本提交推送到 GitHub，再给该提交打对应标签。例如 `0.1.7` 对应 `v0.1.7`。
 
-两端都构建成功后，工作流将 EXE、DMG、Windows 更新签名 `.sig` 和 `latest.json` 放到同一个 GitHub Release 草稿。核对后手动发布为 Latest。Windows 在线更新继续使用 `latest.json`，macOS 通过 DMG 安装，当前仍需手动升级。
+两端都构建成功后，工作流将 EXE、DMG、Windows 更新签名 `.sig` 和 `latest.json` 放到同一个 GitHub Release 草稿。核对后手动发布为 Latest。配齐 Apple 公证凭据时，Windows 与 macOS 在线更新共用 `latest.json`，分别使用签名安装包与公证后的签名 `.app.tar.gz`。缺少 Apple 凭据时，工作流提供 macOS 手动安装 DMG，更新清单仅包含 Windows。已安装的旧版 macOS 如果没有在线更新入口，先用 DMG 覆盖安装。
 
 ## 验证升级
 
 现有 `0.1.3` 用户手动覆盖安装首个带更新功能的版本。之后用两个递增版本实测，确认应用可以检查、下载、安装并重新打开，已有转录记录、设置和模型也能正常读取。保留相同的应用标识、安装模式和安装目录。
+
+
+### macOS 发布签名
+
+正式构建需要 Developer ID Application 证书和 App Store Connect 公证凭据。Actions Secrets 使用 `APPLE_CERTIFICATE`（Base64 的 P12）、`APPLE_CERTIFICATE_PASSWORD`、`APPLE_SIGNING_IDENTITY`、`APPLE_API_KEY`、`APPLE_API_ISSUER` 和 `APPLE_API_KEY_P8`（P8 内容）。试打包可继续使用临时签名。正式发布前在 Apple Silicon 实机上验证 DMG 和两版之间的在线升级。

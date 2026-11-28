@@ -1,5 +1,5 @@
-function createBatchExport(React, jsx, {renderSrt, renderTxt, exportOptions}) {
-  const formats = [['srt', 'SRT 字幕'], ['txt', 'TXT 文本']];
+function createBatchExport(React, jsx, {renderSrt, renderTxt, renderJson, exportOptions}) {
+  const formats = [['srt', 'SRT 字幕'], ['txt', 'TXT 文本'], ['json', '逐字 JSON']];
   const pageSize = 30;
 
   return function BatchExport({records}) {
@@ -57,8 +57,9 @@ function createBatchExport(React, jsx, {renderSrt, renderTxt, exportOptions}) {
           .map(part => String(part).padStart(2, '0')).join('');
         const options = exportOptions();
         const extensions = formats.map(([value]) => value).filter(value => chosenFormats.has(value));
+        const render = {srt:renderSrt, txt:renderTxt, json:renderJson};
         const entries = records.filter(record => selected.has(record.id)).flatMap(record =>
-          extensions.map(ext => [record.title, ext, ext === 'srt' ? renderSrt(record) : renderTxt(record, options)]));
+          extensions.map(ext => [record.title, ext, render[ext](record, options)]));
         const saved = await desktop.invoke('export_zip', {name:timestamp + '.zip', entries});
         if (saved) setNotice({text:`已将 ${entries.length} 个文件保存到 ZIP。`});
       } catch (error) {

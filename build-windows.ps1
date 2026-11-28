@@ -8,6 +8,9 @@ $runtime = Join-Path $staging 'runtime'
 if ($Slim) {
     $runtime = Join-Path $staging 'runtime-slim'
 }
+# Keep cached environments isolated when the set of Python dependencies changes.
+$requirementsHash = (Get-FileHash -LiteralPath 'backend/requirements.txt').Hash.Substring(0, 12).ToLowerInvariant()
+$runtime = "$runtime-$requirementsHash"
 $pythonArchive = Join-Path $staging 'python-3.12.10-embed-amd64.zip'
 $expectedHash = '4ACBED6DD1C744B0376E3B1CF57CE906F9DC9E95E68824584C8099A63025A3C3'
 
@@ -51,7 +54,7 @@ if (-not $BundleOnly) {
         if (!$redist) { throw '找不到 Visual Studio 的 x64 C++ 可再发行运行库。' }
         Copy-Item -Path (Join-Path $redist.FullName '*.dll') -Destination $buildRuntime
         $embedded = Join-Path $buildRuntime 'python.exe'
-        & $embedded -I -B -c 'import av, ctranslate2, faster_whisper, numpy, onnxruntime'
+        & $embedded -I -B -c 'import av, ctranslate2, faster_whisper, numpy, onnxruntime, opencc'
         if ($LASTEXITCODE -ne 0) { throw '嵌入式推理环境验证失败。' }
         Move-Item -LiteralPath $buildRuntime -Destination $runtime
     }

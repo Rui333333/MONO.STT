@@ -164,13 +164,106 @@ function useReadingAudio(React, record, notify) {
   };
 }
 
+function timedReadingPieces(segment) {
+  if (!segment.words?.length || segment.words.map(word => word.text).join('') !== segment.text) return [];
+  return segment.words.flatMap(word => {
+    const parts = word.text.match(/\p{Script=Han}|[^\p{Script=Han}]+/gu) || [];
+    const step = (word.endSec - word.startSec) / parts.length;
+    return parts.map((text, index) => ({
+      text, start: word.startSec + index * step, end: word.startSec + (index + 1) * step,
+    }));
+  });
+}
+
+function renderCharacterJson(record) {
+  const graphemes = new Intl.Segmenter(undefined, {granularity:'grapheme'});
+  const milliseconds = seconds => Number.isFinite(seconds) ? Math.round(seconds * 1000) : null;
+  const segments = record.segments.map(segment => {
+    let offset = 0;
+    const aligned = segment.words?.length && segment.words.map(word => word.text).join('') === segment.text;
+    const words = aligned ? segment.words : [segment];
+    const characters = words.flatMap(word => {
+      const units = [...graphemes.segment(word.text)];
+      const spoken = units.filter(unit => /[\p{L}\p{N}]/u.test(unit.segment)).length;
+      const start = word.startSec;
+      const end = word.endSec;
+      let spokenIndex = 0;
+      const entries = units.map(({segment:text, index}) => {
+        const hasTime = /[\p{L}\p{N}]/u.test(text) && Number.isFinite(start) && Number.isFinite(end) && end > start;
+        const position = spokenIndex;
+        if (hasTime) spokenIndex++;
+        const time = index => milliseconds(start + (end - start) * index / spoken);
+        return {
+          text, offset:offset + index,
+          startMs:hasTime ? time(position) : null,
+          endMs:hasTime ? time(position + 1) : null,
+          timing:hasTime ? (
+            !aligned ? 'segment_interpolated' :
+            word.estimated || spoken > 1 ? 'word_interpolated' : 'whisper'
+          ) : null,
+        };
+      });
+      offset += word.text.length;
+      return entries;
+    });
+    return {
+      text:segment.text, startMs:milliseconds(segment.startSec), endMs:milliseconds(segment.endSec),
+      characters,
+    };
+  });
+  return JSON.stringify({schemaVersion:1, title:record.title, language:record.language, timeUnit:'ms',
+    offsetUnit:'utf16', segments}, null, 2) + '\n';
+}
+
+function subtitleCues(segments) {
+  const cues = [];
+  for (const segment of segments) {
+    const words = timedReadingPieces(segment);
+    const units = [...segment.text.replace(/\s*\n\s*/g, ' ')];
+    const ends = [];
+    let offset = 0;
+    for (const word of words) {
+      offset += [...word.text].length;
+      ends[offset] = word.end;
+    }
+    const width = units.some(char => /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(char)) ? 22 : 42;
+    let start = segment.startSec;
+    for (let pos = 0; pos < units.length;) {
+      const lines = [];
+      for (let row = 0; row < 2 && pos < units.length; row++) {
+        let cut = Math.min(pos + width, units.length);
+        if (cut < units.length) {
+          for (let j = cut; j > pos + width * 0.6; j--) {
+            if (/[\s，。！？、；,.!?;]/u.test(units[j - 1])) { cut = j; break; }
+          }
+        }
+        lines.push(units.slice(pos, cut).join('').trim());
+        pos = cut;
+      }
+      const estimate = segment.startSec + (segment.endSec - segment.startSec) * pos / units.length;
+      const aligned = ends[pos];
+      const end = pos === units.length ? segment.endSec
+        : aligned > start && aligned < segment.endSec ? aligned
+        : estimate > start ? estimate
+        : start + (segment.endSec - start) / (units.length - pos + 1);
+      if (end > start) {
+        cues.push({start, end, text: lines.join('\n')});
+        start = end;
+      }
+    }
+  }
+  return cues;
+}
+
 function createReadingTimeline(React, jsx, formatTime, DeleteIcon) {
-  const Row = React.memo(function TranscriptRow({segment, active, canRemove, readOnly, canSeek, actions}) {
+  const Row = React.memo(function TranscriptRow({segment, active, canRemove, readOnly, canSeek, actions, time}) {
+    const [editing, setEditing] = React.useState(false);
+    const pieces = React.useMemo(() => timedReadingPieces(segment), [segment]);
     const lines = Math.max(1, Math.ceil(segment.text.length / 44));
     return jsx('div', {
       'data-reading-row':active ? '' : undefined,
       className:'reading-row group flex items-start gap-4 -mx-3 px-3 rounded-md',
-      style:{'--reading-row-estimate':(lines * 22.5 + 10 + (segment.speaker ? 17 : 0)) + 'px'},
+      style:{'--reading-row-estimate':(lines * 22.5 + 10) + 'px'},
       children:[
         jsx('button', {
           type:'button', disabled:!canSeek, onClick:() => actions.current.seek(segment.startSec),
@@ -178,33 +271,45 @@ function createReadingTimeline(React, jsx, formatTime, DeleteIcon) {
           children:formatTime(segment.startSec),
         }),
         jsx('div', {className:'flex-1 min-w-0', children:[
-          segment.speaker && jsx('div', {
-            className:'text-[11.5px] font-semibold text-neutral-900 dark:text-neutral-100 mb-0.5',
-            children:segment.speaker,
-          }),
-          jsx('textarea', {
+          pieces.length && !editing ? jsx('div', {className:'reading-timed-text', children:[
+            ...pieces.map((piece, index) => piece.text.trim() ? jsx('button', {
+              type:'button', disabled:!canSeek,
+              className:time >= piece.start && time < piece.end ? 'reading-word reading-word-active' : 'reading-word',
+              onClick:() => actions.current.seek(piece.start), children:piece.text,
+            }, index) : piece.text),
+          ]}) : jsx('textarea', {
+            autoFocus:editing, onBlur:() => setEditing(false),
             value:segment.text, readOnly, onChange:event => actions.current.edit(segment.id, event.target.value),
             rows:lines, placeholder:'输入校对内容...',
             className:'reading-segment w-full text-[15px] text-neutral-800 dark:text-neutral-200 bg-transparent resize-none border-none p-0 focus:outline-none focus:ring-0',
           }),
         ]}),
-        canRemove && jsx('button', {
-          type:'button', onClick:() => actions.current.remove(segment.id), 'aria-label':'删除段落',
-          className:'reading-row-delete p-1 text-neutral-500 transition-opacity shrink-0',
-          children:jsx(DeleteIcon,{className:'w-3.5 h-3.5'}),
-        }),
+        !readOnly && (pieces.length > 0 || canRemove) && jsx('div', {className:'reading-row-actions', children:[
+          pieces.length > 0 && !editing && jsx('button', {
+            type:'button', title:'编辑这句', 'aria-label':'编辑这句',
+            onClick:()=>setEditing(true), className:'reading-row-edit reading-row-delete p-1',
+            children:jsx('svg',{viewBox:'0 0 24 24',className:'w-3.5 h-3.5',fill:'none',stroke:'currentColor',
+              strokeWidth:1.75,strokeLinecap:'round',strokeLinejoin:'round','aria-hidden':true,
+              children:jsx('path',{d:'M13.5 6.5l4 4M5 19l4-.8L19 8.2a2.8 2.8 0 0 0-4-4L5.8 14.5 5 19Z'})}),
+          }),
+          canRemove && jsx('button', {
+            type:'button', onClick:() => actions.current.remove(segment.id), 'aria-label':'删除段落',
+            className:'reading-row-delete p-1 text-neutral-500 transition-opacity shrink-0',
+            children:jsx(DeleteIcon,{className:'w-3.5 h-3.5'}),
+          }),
+        ]}),
       ],
     });
   });
 
-  const Group = React.memo(function TranscriptGroup({segments, activeId, canRemove, readOnly, canSeek, actions, viewport}) {
+  const Group = React.memo(function TranscriptGroup({segments, activeId, canRemove, readOnly, canSeek, actions, viewport, time}) {
     const element = React.useRef(null);
     const measuredHeight = React.useRef(0);
     const [nearby, setNearby] = React.useState(false);
     const [focused, setFocused] = React.useState(false);
     const estimatedHeight = React.useMemo(() => segments.reduce((height, segment) =>
       height + Math.max(1, Math.ceil(segment.text.length / 44)) * 22.5 +
-        (segment.speaker ? 17 : 0) + 12, -2), [segments]);
+        12, -2), [segments]);
     const mounted = nearby || focused || activeId !== null;
 
     React.useEffect(() => {
@@ -239,12 +344,12 @@ function createReadingTimeline(React, jsx, formatTime, DeleteIcon) {
         if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
       },
       children:mounted ? segments.map(segment => jsx(Row, {
-        segment, active:segment.id === activeId, canRemove, readOnly, canSeek, actions,
+        segment, active:segment.id === activeId, canRemove, readOnly, canSeek, actions, time:segment.id === activeId ? time : -1,
       }, segment.id)) : null,
     });
   });
 
-  return React.memo(function ReadingTimeline({segments, activeId, query, canRemove, readOnly, canSeek, actions, viewport}) {
+  return React.memo(function ReadingTimeline({segments, activeId, query, canRemove, readOnly, canSeek, actions, viewport, time}) {
     const [groups, groupIds] = React.useMemo(() => {
       const groups = [];
       const groupIds = new Map();
@@ -259,9 +364,9 @@ function createReadingTimeline(React, jsx, formatTime, DeleteIcon) {
     const activeGroup = groupIds.get(activeId);
     return jsx('div', {className:'reading-rows', children:groups.length ?
       groups.map((group,index) => jsx(Group, {
-        segments:group, activeId:index === activeGroup ? activeId : null, canRemove, readOnly, canSeek, actions, viewport,
+        segments:group, activeId:index === activeGroup ? activeId : null, canRemove, readOnly, canSeek, actions, viewport, time:index === activeGroup ? time : -1,
       }, group[0].id)) :
-      jsx('p',{className:'py-10 text-center text-[13px] text-neutral-400',children:`未在正文中找到「${query}」`}),
+      jsx('p',{className:'py-10 text-center text-[13px] text-neutral-400',children:query ? `未在正文中找到「${query}」` : "暂无转录内容"}),
     });
   });
 }
@@ -287,11 +392,10 @@ function createReadingPreview(React, jsx, markdown, plaintext) {
 }
 
 function createReadingMenu(React, jsx, icons) {
-  const formats = [['txt', '纯文本 (.txt)'], ['markdown', 'Markdown (.md)'], ['srt', '字幕 (.srt)']];
+  const formats = [['txt', '纯文本 (.txt)'], ['markdown', 'Markdown (.md)'], ['srt', '字幕 (.srt)'], ['json', '逐字时间戳 (.json)']];
   const options = [
     ['includeMetadata', '包含元数据头'],
     ['includeTimestamps', '保留时间戳'],
-    ['includeSpeakers', '保留说话人'],
   ];
 
   return function ReadingMenu({starred, onStar, copied, onCopy, feishu, exportOptions, onOptions, onExport}) {

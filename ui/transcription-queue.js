@@ -76,7 +76,18 @@ function useTranscriptionQueue(React, notify, onComplete) {
         store.rememberTranscription(record);
         onComplete(record);
         changes = {stage:'completed', progress:100, draftAttempt:undefined, error:undefined};
-        notify('转录完成：' + record.title);
+        if (job.options.characterJson) {
+          try {
+            const path = await desktop.invoke('save_character_json', {
+              id:record.id, title:record.title, content:renderCharacterJson(record),
+            });
+            notify('逐字 JSON 已保存至 ' + path);
+          } catch (error) {
+            notify('转录已完成，逐字 JSON 保存失败：' + error);
+          }
+        } else {
+          notify('转录完成：' + record.title);
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         changes = message === 'TRANSCRIPTION_CANCELLED' ? {stage:'cancelled'} : {stage:'error', error:message};
